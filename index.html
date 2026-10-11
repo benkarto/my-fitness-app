@@ -1,0 +1,1667 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Fitness App</title>
+<meta name="description" content="צ׳קליסט אימונים לפי לוח שבועי, עם משקלים, הליכון והיסטוריה. הנתונים נשמרים במכשיר.">
+<meta name="theme-color" content="#141719">
+<meta name="color-scheme" content="light dark">
+<meta name="format-detection" content="telephone=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="My Fitness App">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:'Heebo';font-style:normal;font-display:swap;font-weight:100 900;src:url(heebo-hebrew.woff2) format('woff2');unicode-range:U+0307-0308,U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F}
+@font-face{font-family:'Heebo';font-style:normal;font-display:swap;font-weight:100 900;src:url(heebo-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+/* Layout: one phone-width column. An ink calendar band (week label, date range, seven day cells) sits above the selected day's checklist on warm paper; machine rows are tickable cards carrying the gym's red machine-number plate; a fixed four-tab bar runs along the bottom, and an ink strip sits behind the phone's status bar. */
+:root{
+  --paper:#EDE9E3;
+  --card:#FFFFFF;
+  --ink:#141719;
+  --dim:#66615B;
+  --line:#CFC8BE;
+  --field:#F6F3EF;
+  --head:#141719;
+  --head-fg:#EDE9E3;
+  --head-dim:#ABA69E;
+  --head-line:#363C40;
+  --done:#2E5D4B;
+  --done-wash:#E2EAE4;
+  --on-done:#FFFFFF;
+  --mark:#C3352B;
+  --on-mark:#FFFFFF;
+  --ok:#4F9B79;
+  --wait:#C98A2E;
+  --bad:#D2493E;
+  --font:'Heebo', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111416; --card:#1A1E21; --ink:#ECE7E0; --dim:#A19B92; --line:#31373B; --field:#15191C;
+    --head:#20262A; --head-fg:#ECE7E0; --head-dim:#A39D94; --head-line:#3A4247;
+    --done:#5FA886; --done-wash:#17261F; --on-done:#0C1712;
+    --mark:#C9443A; --on-mark:#FFFFFF;
+    --ok:#6CC097; --wait:#E0A44A; --bad:#EF6A5E;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111416; --card:#1A1E21; --ink:#ECE7E0; --dim:#A19B92; --line:#31373B; --field:#15191C;
+  --head:#20262A; --head-fg:#ECE7E0; --head-dim:#A39D94; --head-line:#3A4247;
+  --done:#5FA886; --done-wash:#17261F; --on-done:#0C1712;
+  --mark:#C9443A; --on-mark:#FFFFFF;
+  --ok:#6CC097; --wait:#E0A44A; --bad:#EF6A5E;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--paper);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45}
+[hidden]{display:none!important}
+img{max-width:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{touch-action:manipulation}
+h1,h2,h3,p{margin:0}
+h1,h2,h3{text-wrap:balance}
+input,.dn,.count,.num,.wval,.rin,.hd{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--done);outline-offset:1px}
+
+.sbar{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--head);z-index:25}
+#app{max-width:560px;margin-inline:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+#view{display:grid;gap:14px;outline:none}
+
+/* week band */
+.wk{background:var(--head);color:var(--head-fg);border-radius:18px;padding:14px 10px 10px;display:grid;gap:12px}
+.wk-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-inline:8px}
+.wk-titles{min-width:0}
+.wk-label{font-size:1.15rem;font-weight:800;line-height:1.25}
+.wk-range{font-size:.88rem;color:var(--head-dim)}
+.wk-nav{display:flex;align-items:center;gap:6px;flex:none}
+.wk-btn{min-width:42px;height:42px;border-radius:12px;border:1px solid var(--head-line);background:transparent;color:var(--head-fg);display:inline-grid;place-items:center;cursor:pointer;padding:0 10px;font-size:.9rem;font-weight:500}
+.wk-btn svg{width:20px;height:20px}
+.strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.dcell{display:grid;justify-items:center;gap:3px;padding:8px 0 9px;border-radius:12px;border:0;background:transparent;color:var(--head-fg);cursor:pointer}
+.dl{font-size:.78rem;color:var(--head-dim);font-weight:500}
+.dn{font-size:1.15rem;font-weight:700;line-height:1.2}
+.dcell.today .dn{text-decoration:underline;text-decoration-color:var(--mark);text-decoration-thickness:3px;text-underline-offset:5px}
+.dm{width:9px;height:9px;border-radius:50%;margin-top:2px}
+.dcell[aria-selected="true"]{background:var(--head-fg);color:var(--head)}
+.dcell[aria-selected="true"] .dl{color:var(--head)}
+.st-full .dm{background:var(--ok)}
+.st-part .dm{box-shadow:inset 0 0 0 2px var(--ok)}
+.st-planned .dm{background:currentColor;transform:scale(.7)}
+.st-missed .dm{box-shadow:inset 0 0 0 1.5px var(--head-dim)}
+.dcell[aria-selected="true"].st-missed .dm{box-shadow:inset 0 0 0 1.5px var(--head)}
+
+/* day panel */
+.day{display:grid;gap:12px}
+.dtitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-inline:4px}
+.dtitle h1{font-size:2rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.rel{font-size:.8rem;font-weight:700;border-radius:99px;padding:1px 10px;background:var(--mark);color:var(--on-mark)}
+.rel.soft{background:transparent;color:var(--dim);box-shadow:inset 0 0 0 1px var(--line)}
+.dsub{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--dim);padding-inline:4px;margin-top:-8px}
+.prog{display:grid;gap:6px;padding-inline:4px}
+.bar{height:7px;border-radius:99px;background:var(--line);overflow:hidden}
+.fill{height:100%;background:var(--done);border-radius:99px;transition:width .3s}
+.count{font-size:.95rem;font-weight:500}
+.count.complete{color:var(--done);font-weight:700}
+
+.status{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;color:var(--dim);white-space:nowrap}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--wait)}
+.status.st-ok::before{background:var(--ok)}
+.status.st-err::before{background:var(--bad)}
+
+.sess{display:grid;gap:8px}
+.shead{display:flex;align-items:baseline;justify-content:space-between;gap:6px 10px;flex-wrap:wrap;padding-inline:4px;margin-top:6px}
+.shead h2{font-size:1.2rem;font-weight:800}
+.smeta{font-size:.85rem;color:var(--dim)}
+.list{display:grid;gap:8px}
+.group{font-size:.82rem;font-weight:700;color:var(--dim);padding-inline:4px;margin-top:6px}
+.list>.group:first-child{margin-top:0}
+
+.row{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;gap:12px;align-items:flex-start}
+.row.done{background:var(--done-wash);border-color:var(--done)}
+.row.skipped{background:transparent;border-style:dashed}
+.row.preview{padding:10px 12px}
+.tick{flex:none;width:46px;height:46px;border-radius:12px;border:2px solid var(--line);background:var(--field);display:grid;place-items:center;color:var(--on-done);cursor:pointer;padding:0}
+.tick svg{width:24px;height:24px;opacity:0;transition:opacity .15s}
+.row.done .tick{background:var(--done);border-color:var(--done)}
+.row.done .tick svg{opacity:1}
+.state{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center}
+.state svg{width:18px;height:18px}
+.state.yes{background:var(--done);color:var(--on-done)}
+.state.no{box-shadow:inset 0 0 0 1.5px var(--line);color:var(--dim)}
+.body{flex:1;min-width:0;display:grid;gap:3px}
+.name{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:1.05rem;font-weight:700;line-height:1.3}
+.row.done.live .nm{text-decoration:line-through;text-decoration-thickness:2px;opacity:.6}
+.num{display:inline-block;background:var(--mark);color:var(--on-mark);font-size:.75rem;font-weight:700;line-height:1.55;border-radius:5px;padding:0 7px}
+.meta{font-size:.9rem;color:var(--dim)}
+.desc{font-size:.84rem;color:var(--dim)}
+.skip{font-size:.8rem;color:var(--dim);font-weight:700}
+.res{font-size:.9rem;font-weight:500}
+
+.wrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.wlab,.unit{font-size:.85rem;color:var(--dim)}
+.stepper{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--field)}
+.step{width:46px;min-height:42px;border:0;background:transparent;font-size:1.35rem;line-height:1;cursor:pointer;color:var(--ink);padding:0}
+.step:active{background:var(--line)}
+.wval{width:70px;border:0;border-inline:1px solid var(--line);background:var(--card);color:var(--ink);text-align:center;font-size:17px;font-weight:700;padding:0 4px;border-radius:0;min-width:0}
+
+.results{margin-top:8px;display:grid;gap:6px}
+.rhead{font-size:.85rem;font-weight:700;color:var(--dim)}
+.rgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.rf{display:grid;gap:3px;min-width:0}
+.rl{font-size:.8rem;color:var(--dim)}
+.rin{width:100%;min-width:0;font-size:16px;font-weight:500;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 6px;min-height:42px;text-align:center}
+.time{display:flex;align-items:center;gap:4px}
+.time .rin{flex:1}
+.colon{font-weight:700}
+
+.notecard{display:grid;gap:6px}
+.nlabel{font-size:.85rem;font-weight:700;color:var(--dim);padding-inline:4px}
+.ntext{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;white-space:pre-wrap}
+textarea,.field input{width:100%;min-width:0;font-size:16px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-height:44px}
+textarea{resize:vertical;line-height:1.5;background:var(--card)}
+.field{display:grid;gap:4px;min-width:0}
+.field>span{font-size:.85rem;color:var(--dim);font-weight:500}
+.selwrap{position:relative;display:block;min-width:0}
+.selwrap select{appearance:none;-webkit-appearance:none;width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);font-size:16px;padding-block:8px;padding-inline:12px 40px;cursor:pointer}
+.selarrow{position:absolute;inset-inline-end:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--dim);display:grid}
+.selarrow svg{width:18px;height:18px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:1rem;font-weight:500;cursor:pointer;text-align:center}
+.btn svg{width:18px;height:18px;flex:none}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.btn.danger{color:var(--mark);border-color:var(--mark);background:transparent}
+.btn.danger-solid{background:var(--mark);border-color:var(--mark);color:var(--on-mark)}
+.btn.small{min-height:38px;padding:4px 12px;font-size:.9rem;border-radius:10px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--dim)}
+.btn:disabled{opacity:.45;cursor:default}
+.icon-btn{width:40px;height:40px;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;padding:0;flex:none}
+.icon-btn svg{width:18px;height:18px}
+.icon-btn:disabled{opacity:.3;cursor:default}
+.factions,.dact{display:flex;flex-wrap:wrap;gap:8px}
+
+.empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:16px;display:grid;gap:10px;justify-items:start}
+.empty>p{max-width:60ch}
+.empty .selwrap{justify-self:stretch}
+.empty-t{font-weight:800;font-size:1.1rem}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:12px}
+.panel h3{font-size:1rem;font-weight:800}
+.dedit{display:grid;gap:10px}
+.dedit>.btn{justify-self:start}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.tchip{display:inline-flex;align-items:center;gap:2px;background:var(--field);border:1px solid var(--line);border-radius:99px;padding-block:2px;padding-inline:12px 3px;font-weight:500;max-width:100%}
+.tchip button{width:32px;height:32px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--dim);padding:0;flex:none}
+.tchip button svg{width:16px;height:16px}
+.rest{color:var(--dim)}
+.days7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.days7 button{display:grid;justify-items:center;min-height:50px;padding:4px 0;border-radius:10px;border:1px solid var(--line);background:var(--field);cursor:pointer;color:var(--ink)}
+.days7 .m-l{font-size:.75rem;color:var(--dim)}
+.days7 .m-n{font-weight:700}
+.days7 button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.days7 button[aria-pressed="true"] .m-l{color:var(--paper)}
+.days7 button:disabled{opacity:.3;cursor:default}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;padding:3px;background:var(--field);gap:3px;justify-self:start}
+.seg button{border:0;background:transparent;border-radius:9px;padding:8px 14px;min-height:40px;cursor:pointer;font-weight:500;color:var(--dim)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.seg button:disabled{opacity:.4;cursor:default}
+.hint{font-size:.85rem;color:var(--dim)}
+.note{color:var(--dim);font-size:.92rem;padding-inline:4px;max-width:62ch}
+.err{color:var(--mark);font-weight:500;font-size:.9rem}
+.confirm{border:1.5px solid var(--mark);border-radius:12px;padding:12px;display:grid;gap:10px;background:var(--card)}
+
+/* notices */
+.upd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--ink);color:var(--paper);border-radius:14px;padding:10px 12px 10px 14px;font-weight:500}
+.upd .btn{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.remind{background:var(--card);border:1.5px solid var(--wait);border-radius:14px;padding:14px;display:grid;gap:8px;justify-items:start}
+.remind>p{max-width:60ch}
+.install{background:var(--card);border:1.5px solid var(--mark);border-radius:14px;padding:14px;display:grid;gap:6px}
+.install>p{max-width:60ch}
+.warn{color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.rpanel{display:grid;gap:10px;justify-self:stretch;width:100%}
+
+/* views */
+.vhead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-inline:4px;margin-top:4px}
+.vhead h1{font-size:1.75rem;font-weight:800;letter-spacing:-.01em;line-height:1.15;min-width:0}
+.lede{color:var(--dim);padding-inline:4px;max-width:62ch}
+.sec{display:grid;gap:10px;margin-top:6px}
+.sec>h2,.h2{font-size:1.15rem;font-weight:800;padding-inline:4px}
+.plist,.tlist,.sched,.hlist{display:grid;gap:8px}
+.prow{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.pmain{flex:1 1 190px;min-width:0;display:grid;gap:3px}
+.pact{display:flex;gap:6px;align-items:center;flex:none}
+.tcard,.hitem{width:100%;text-align:start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 12px;cursor:pointer;color:var(--ink)}
+.tmain,.hmain{display:grid;gap:3px;min-width:0}
+.tname{font-size:1.1rem;font-weight:800}
+.tsum{font-size:.9rem;color:var(--dim)}
+.chev{color:var(--dim);display:grid}
+.chev svg{width:20px;height:20px}
+.pform{background:var(--card);border:1.5px solid var(--ink);border-radius:14px;padding:14px;display:grid;gap:12px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+fieldset{border:1px solid var(--line);border-radius:12px;padding:10px 12px 12px;margin:0;display:grid;gap:10px;min-width:0}
+legend{font-size:.9rem;font-weight:800;padding:0 6px}
+.fieldrow{display:grid;gap:4px}
+.flabel{font-size:.85rem;color:var(--dim);font-weight:500}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--dim);font-weight:500;padding:6px 2px;min-height:40px;cursor:pointer;justify-self:start}
+.back svg{width:18px;height:18px}
+
+.srow{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px 12px;align-items:center}
+.srow.today{border-color:var(--ink)}
+.sday{font-weight:800;display:grid;gap:2px;align-self:start;padding-top:6px}
+.stoday{font-size:.75rem;font-weight:700;color:var(--mark)}
+.srow>.chips,.srow>.selwrap{grid-column:2}
+
+.month{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:1.1rem;font-weight:800;padding-inline:4px;margin-top:8px}
+.mcount{font-size:.85rem;font-weight:500;color:var(--dim)}
+.hdate{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.hday{font-weight:800;font-size:1.05rem}
+.hd{color:var(--dim);font-size:.9rem}
+.hsum{font-size:.9rem}
+.hnote{font-size:.85rem;color:var(--dim)}
+.dots{display:flex;flex-wrap:wrap;gap:3px;margin-block:2px}
+.dots i{width:9px;height:9px;border-radius:2px;box-shadow:inset 0 0 0 1.5px var(--line)}
+.dots i.on{background:var(--done);box-shadow:none}
+
+.welcome{display:grid;gap:14px;padding-block:12px}
+.wtitle{font-size:2.5rem;font-weight:800;letter-spacing:-.02em;line-height:1.05;padding-inline:4px}
+.choice{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;justify-items:start}
+
+/* tab bar */
+.tabs{position:fixed;inset-inline:0;bottom:0;z-index:20;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs-in{max-width:560px;margin-inline:auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.tab{display:grid;justify-items:center;gap:2px;padding:8px 2px 9px;min-height:58px;border:0;background:none;color:var(--dim);font-size:.78rem;font-weight:500;cursor:pointer}
+.tab svg{width:24px;height:24px}
+.tab[aria-current="page"]{color:var(--ink);font-weight:700}
+.tab[aria-current="page"] svg{color:var(--mark)}
+
+.toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:14px;font-size:.92rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30;width:max-content;max-width:calc(100% - 32px);text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:370px){
+  .grid3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dtitle h1{font-size:1.75rem}
+  .srow{grid-template-columns:1fr}
+  .srow>.chips,.srow>.selwrap{grid-column:1}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="sbar" aria-hidden="true"></div>
+<div id="app">
+  <main id="view" tabindex="-1"></main>
+</div>
+<nav class="tabs" id="tabs" aria-label="ניווט ראשי" hidden>
+  <div class="tabs-in">
+    <button class="tab" type="button" id="tab-week" data-tab="week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 15l2 2 4-4"/></svg><span>השבוע</span></button>
+    <button class="tab" type="button" id="tab-schedule" data-tab="schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="1.8" fill="currentColor"/><circle cx="15" cy="12" r="1.8" fill="currentColor"/><circle cx="10" cy="18" r="1.8" fill="currentColor"/></svg><span>לוח קבוע</span></button>
+    <button class="tab" type="button" id="tab-types" data-tab="types"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg><span>אימונים</span></button>
+    <button class="tab" type="button" id="tab-history" data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>היסטוריה</span></button>
+  </div>
+</nav>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+/* ==========================================================================
+ * My Fitness App: a standalone web app. No account and no server: everything is
+ * saved in the browser storage of the device, and backups are JSON files.
+ *
+ * Storage (localStorage, one key per document)
+ *   mfa:app                    PlanDoc
+ *   mfa:w:<YYYY-MM-DD>         DayRecord (one per date)
+ *   mfa:meta                   {lastBackupAt}
+ * Backup file = {app:'my-fitness-app', format:2, exportedAt, plan:PlanDoc, workouts:[DayRecord]}
+ *
+ * PlanDoc   = {schema:2, catalog:[Item], types:[Type], schedule:[Version],
+ *              overrides:{date:[typeId]}, createdAt, updatedAt}
+ * Item      = strength {id, kind:'strength', name, machine, group, desc, sets, reps, weight}
+ *           | cardio   {id, kind:'cardio', name, mode:'walk'|'walkrun', minutes,
+ *                       walk:{speed,incline}, run:{speed,incline,minutes,every},
+ *                       cooldown:{minutes,speed,incline}, notes}
+ *             Weight lives on the item, so it is shared by every type that uses it.
+ * Type      = {id, name, items:[itemId]}             (ordered)
+ * Version   = {from:'YYYY-MM-DD', days:[[typeId] x7]} (index 0 = Sunday); the
+ *             weekly schedule in force on a date is the latest version with
+ *             from <= date. Permanent changes add a version from today.
+ * overrides = one-time changes: the exact list of type ids for that date.
+ * DayRecord = {schema:2, date, createdAt, updatedAt, note,
+ *              sessions:[{typeId, name, items:[RecItem]}]}
+ * RecItem   = strength {id, kind, name, machine, group, sets, reps, weight, done}
+ *           | cardio   {id, kind, name, mode, minutes, walk, run, cooldown, notes,
+ *                       done, result:{min,sec,km,hr,kcal}}
+ * Today's record follows the plan live (rebuilt on every write); records of
+ * other dates are frozen snapshots and change only when edited directly.
+ * ========================================================================== */
+
+const D = document;
+const P = 'mfa:';
+const GROUPS = ['חזה','גב','כתפיים','רגליים','ידיים','בטן','אחר'];
+const WD_LETTER = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+const WD_NAME = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const fDay = new Intl.DateTimeFormat('he-IL', {weekday:'long'});
+const fDate = new Intl.DateTimeFormat('he-IL', {day:'numeric', month:'long', year:'numeric'});
+const fDM = new Intl.DateTimeFormat('he-IL', {day:'numeric', month:'long'});
+const fMonth = new Intl.DateTimeFormat('he-IL', {month:'long', year:'numeric'});
+
+/* Starter plan offered to new users (machine list without weights). */
+const SAMPLE_CATALOG = [
+  {id:'m2',  kind:'strength', name:'לחיצת חזה במכשיר', machine:'2', group:'חזה', desc:'לחיצה מתכנסת, תוצרת Precor', sets:3, reps:12},
+  {id:'m8a', kind:'strength', name:'חתירה בישיבה באחיזה צרה', machine:'8', group:'גב', desc:'פרפר ופרפר הפוך, תוצרת Precor', sets:2, reps:15},
+  {id:'m8b', kind:'strength', name:'הרחקה אופקית במכונה', machine:'8', group:'גב', desc:'פרפר ופרפר הפוך, תוצרת Precor', sets:2, reps:15},
+  {id:'m1',  kind:'strength', name:'לחיצת כתפיים בישיבה', machine:'1', group:'כתפיים', desc:'לחיצת כתפיים, תוצרת Precor', sets:3, reps:10},
+  {id:'m13', kind:'strength', name:'הרחקת כתפיים', machine:'13', group:'כתפיים', desc:'הרחקה לצדדים, תוצרת Spirit', sets:2, reps:10},
+  {id:'m19', kind:'strength', name:'פשיטת ברך', machine:'19', group:'רגליים', desc:'מכשיר בישיבה', sets:2, reps:12},
+  {id:'m18', kind:'strength', name:'כפיפת ברך בשכיבה', machine:'18', group:'רגליים', desc:'תוצרת Precor', sets:2, reps:12},
+  {id:'m17', kind:'strength', name:'לחיצת רגליים', machine:'17', group:'רגליים', desc:'תוצרת Precor', sets:2, reps:12},
+  {id:'m14', kind:'strength', name:'כפיפת מרפקים', machine:'14', group:'ידיים', desc:'משקולות מובנות, ריפוד אדום', sets:3, reps:12},
+  {id:'mdip',kind:'strength', name:'פשיטת מרפקים במכשיר מקבילים', machine:'', group:'ידיים', desc:'מכשיר מקבילים של Nautilus, בלי מספר', sets:3, reps:12},
+  {id:'m12', kind:'strength', name:'כפיפת בטן במכשיר', machine:'12', group:'בטן', desc:'תוצרת Precor', sets:3, reps:12},
+  {id:'tm',  kind:'cardio', name:'הליכון', mode:'walk', minutes:20, walk:{speed:null, incline:null}, run:{speed:null, incline:null, minutes:null, every:null}, cooldown:{minutes:null, speed:null, incline:null}, notes:'הליכה מהירה בשיפוע נמוך'}
+];
+
+const SVG = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+const I = {
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
+  dash:SVG('<path d="M7 12h10"/>'),
+  right:SVG('<path d="M9 6l6 6-6 6"/>'),
+  left:SVG('<path d="M15 6l-6 6 6 6"/>'),
+  up:SVG('<path d="M12 19V5M6 11l6-6 6 6"/>'),
+  down:SVG('<path d="M12 5v14M6 13l6 6 6-6"/>'),
+  x:SVG('<path d="M6 6l12 12M18 6L6 18"/>'),
+  plus:SVG('<path d="M12 5v14M5 12h14"/>'),
+  caret:SVG('<path d="M6 9l6 6 6-6"/>')
+};
+
+/* ---------- small utilities ---------- */
+const pad = n => String(n).padStart(2, '0');
+const keyOf = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const todayKey = () => keyOf(new Date());
+const keyDate = k => { const p = k.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
+const addDays = (k, n) => { const d = keyDate(k); d.setDate(d.getDate() + n); return keyOf(d); };
+const weekdayOf = k => keyDate(k).getDay();
+const weekStart = k => addDays(k, -weekdayOf(k));
+const dayDiff = (a, b) => Math.round((keyDate(b) - keyDate(a)) / 864e5);
+const isKey = k => typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k);
+const nowISO = () => new Date().toISOString();
+const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
+const uniq = a => a.filter((x, i) => a.indexOf(x) === i);
+const emptyWeek = () => [[], [], [], [], [], [], []];
+const newId = p => p + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
+function stable(v){
+  if (v === null || typeof v !== 'object') return JSON.stringify(v === undefined ? null : v);
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+}
+const same = (a, b) => stable(a) === stable(b);
+function num(v){
+  if (v === '' || v == null) return null;
+  const n = typeof v === 'number' ? v : Number(String(v).trim().replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+const round2 = n => Math.round(n * 100) / 100;
+const fmtNum = v => { const n = num(v); return n == null ? '' : String(round2(n)); };
+const posInt = v => { const n = num(v); return n == null || n <= 0 ? null : Math.round(n); };
+const nonNeg = v => { const n = num(v); return n == null || n < 0 ? null : round2(n); };
+const excerpt = (s, n) => s.length > n ? s.slice(0, n).trim() + '…' : s;
+function minutesPhrase(m){ const n = num(m); return n === 1 ? 'דקה' : n === 2 ? 'שתי דקות' : fmtNum(n) + ' דקות'; }
+function setsText(sets, reps){
+  const s = num(sets), r = num(reps);
+  let a = s ? (s === 1 ? 'סט אחד' : s + ' סטים') : '';
+  if (r) a += (a ? ' של ' : '') + (r === 1 ? 'חזרה אחת' : r + ' חזרות');
+  return a;
+}
+function itemsSummary(sn, cn){
+  const a = [];
+  if (sn) a.push(sn === 1 ? 'מכשיר אחד' : sn + ' מכשירים');
+  if (cn) a.push(cn === 1 ? 'פעילות אירובית' : cn + ' פעילויות אירוביות');
+  return a.join(' ו');
+}
+function speedIncline(sp, inc){
+  const a = [];
+  if (num(sp) != null) a.push('במהירות ' + fmtNum(sp) + ' קמ״ש');
+  if (num(inc) != null) a.push('שיפוע ' + fmtNum(inc));
+  return a.join(', ');
+}
+function cardioLines(c){
+  const L = [], w = c.walk || {}, r = c.run || {}, cd = c.cooldown || {};
+  const walk = speedIncline(w.speed, w.incline);
+  if (walk || c.mode === 'walkrun') L.push('הליכה' + (walk ? ' ' + walk : ''));
+  if (c.mode === 'walkrun') {
+    let run = 'ריצה';
+    if (num(r.minutes) != null) run += ' של ' + minutesPhrase(r.minutes);
+    if (num(r.every) != null) run += ' כל ' + minutesPhrase(r.every);
+    const rs = speedIncline(r.speed, r.incline);
+    if (rs) run += ', ' + rs;
+    L.push(run);
+  }
+  if (num(c.minutes) != null) L.push('משך כולל ' + minutesPhrase(c.minutes));
+  if (num(cd.minutes) != null) { const s = speedIncline(cd.speed, cd.incline); L.push('התקררות ' + minutesPhrase(cd.minutes) + (s ? ' ' + s : '')); }
+  if (c.notes) L.push(c.notes);
+  return L;
+}
+const emptyResult = () => ({min:null, sec:null, km:null, hr:null, kcal:null});
+const hasResult = r => !!r && ['min','sec','km','hr','kcal'].some(k => r[k] != null && r[k] !== '');
+function timeStr(r){
+  const m = num(r.min), s = num(r.sec);
+  if (m == null && s == null) return '';
+  const mm = Math.floor(m || 0), ss = Math.round(s || 0);
+  return mm >= 60 ? Math.floor(mm / 60) + ':' + pad(mm % 60) + ':' + pad(ss) : mm + ':' + pad(ss);
+}
+function resultText(r){
+  if (!r) return '';
+  const a = [], t = timeStr(r);
+  if (t) a.push('זמן ' + t);
+  if (num(r.km) != null) a.push(fmtNum(r.km) + ' ק״מ');
+  if (num(r.hr) != null) a.push('דופק ממוצע ' + fmtNum(r.hr));
+  if (num(r.kcal) != null) a.push(fmtNum(r.kcal) + ' קלוריות');
+  return a.join(', ');
+}
+function isStandalone(){ try { return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches; } catch (e) { return false; } }
+function isIOS(){ const ua = navigator.userAgent || ''; return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function isMobileOS(){ return isIOS() || /Android/i.test(navigator.userAgent || ''); }
+
+/* ---------- element builder ---------- */
+function h(tag, attrs){
+  const el = D.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k.slice(0, 2) === 'on' && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (let i = 2; i < arguments.length; i++) {
+    const kid = arguments[i];
+    if (kid == null || kid === false) continue;
+    if (Array.isArray(kid)) kid.forEach(x => { if (x != null && x !== false) el.append(x.nodeType ? x : D.createTextNode(String(x))); });
+    else el.append(kid.nodeType ? kid : D.createTextNode(String(kid)));
+  }
+  return el;
+}
+const enterBlur = e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } };
+const focusSoon = id => setTimeout(() => { const el = D.getElementById(id); if (el) try { el.focus(); } catch (e) {} }, 40);
+
+/* ---------- device storage ---------- */
+const store = {
+  get(k){ try { const v = localStorage.getItem(P + k); return v == null ? null : JSON.parse(v); } catch (e) { return null; } },
+  set(k, v){ try { localStorage.setItem(P + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  del(k){ try { localStorage.removeItem(P + k); return true; } catch (e) { return false; } },
+  keys(){ const out = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(P) === 0) out.push(k.slice(P.length)); } } catch (e) {} return out; }
+};
+function storageWorks(){ try { localStorage.setItem(P + 'probe', '1'); localStorage.removeItem(P + 'probe'); return true; } catch (e) { return false; } }
+
+/* ---------- state ---------- */
+const S = {
+  ready:false, app:null, workouts:{}, meta:{},
+  tab:'week', sel:todayKey(), lastToday:todayKey(),
+  dayEdit:null, moveTarget:null, moveKind:'once', pastEdit:null, virtual:null,
+  sub:null, draft:null, draftError:null, confirm:null,
+  restoreOpen:false, restoreText:'', restoreError:null, restorePending:null, backupText:'',
+  status:'local', storageOK:true, warned:false, updateReady:false
+};
+
+const cat = () => (S.app && S.app.catalog) || [];
+const types = () => (S.app && S.app.types) || [];
+const catById = id => cat().find(c => c.id === id) || null;
+const typeById = id => types().find(t => t.id === id) || null;
+
+function normApp(a){
+  if (!a || typeof a !== 'object') return null;
+  const o = clone(a);
+  o.schema = 2;
+  o.catalog = Array.isArray(o.catalog) ? o.catalog.filter(c => c && typeof c.id === 'string') : [];
+  o.catalog.forEach(c => { c.kind = c.kind === 'cardio' ? 'cardio' : 'strength'; c.name = String(c.name || ''); });
+  o.types = Array.isArray(o.types) ? o.types.filter(t => t && typeof t.id === 'string') : [];
+  o.types.forEach(t => { t.name = String(t.name || ''); t.items = Array.isArray(t.items) ? t.items.filter(x => typeof x === 'string') : []; });
+  o.schedule = Array.isArray(o.schedule) ? o.schedule.filter(v => v && isKey(v.from) && Array.isArray(v.days))
+    .map(v => ({from:v.from, days:[0,1,2,3,4,5,6].map(i => Array.isArray(v.days[i]) ? v.days[i].filter(x => typeof x === 'string') : [])}))
+    .sort((x, y) => x.from < y.from ? -1 : x.from > y.from ? 1 : 0) : [];
+  o.overrides = o.overrides && typeof o.overrides === 'object' && !Array.isArray(o.overrides) ? o.overrides : {};
+  Object.keys(o.overrides).forEach(k => { if (!isKey(k) || !Array.isArray(o.overrides[k])) delete o.overrides[k]; });
+  return o;
+}
+function normRec(r){
+  if (!r || typeof r !== 'object' || !isKey(r.date)) return null;
+  const o = clone(r);
+  o.sessions = Array.isArray(o.sessions) ? o.sessions.filter(s => s && Array.isArray(s.items)) : [];
+  o.note = typeof o.note === 'string' ? o.note : '';
+  return o;
+}
+
+/* ---------- schedule ---------- */
+function versionFor(date, app){
+  const a = app || S.app; let v = null;
+  ((a && a.schedule) || []).forEach(x => { if (x.from <= date) v = x; });
+  return v;
+}
+function templateFor(date, app){ const v = versionFor(date, app); return v ? (v.days[weekdayOf(date)] || []).slice() : []; }
+function hasOverride(date, app){ const a = app || S.app; return !!(a && a.overrides && Object.prototype.hasOwnProperty.call(a.overrides, date)); }
+function rawPlanned(date, app){ const a = app || S.app; return hasOverride(date, a) ? a.overrides[date].slice() : templateFor(date, a); }
+function plannedTypes(date){ return uniq(rawPlanned(date).filter(id => typeById(id))); }
+function scheduleEmpty(){ const v = versionFor(todayKey()); return !v || v.days.every(d => !d.some(id => typeById(id))); }
+function scheduledDays(tid){ const v = versionFor(todayKey()); const out = []; if (v) v.days.forEach((d, i) => { if (d.includes(tid)) out.push(i); }); return out; }
+function sameSet(a, b){ const x = uniq(a).sort(), y = uniq(b).sort(); return x.length === y.length && x.every((v, i) => v === y[i]); }
+function setOverride(app, date, ids){
+  app.overrides = app.overrides || {};
+  const clean = uniq(ids.filter(id => app.types.some(t => t.id === id)));
+  if (sameSet(clean, templateFor(date, app).filter(id => app.types.some(t => t.id === id)))) delete app.overrides[date];
+  else app.overrides[date] = clean;
+}
+function upsertVersion(app, from, days){
+  const sch = (app.schedule || []).filter(v => v.from < from).sort((x, y) => x.from < y.from ? -1 : 1);
+  const prev = sch[sch.length - 1];
+  if (!(prev && same(prev.days, days))) sch.push({from, days});
+  app.schedule = sch;
+}
+function editSchedule(fn){
+  const app = clone(S.app), t = todayKey();
+  const cur = versionFor(t, app);
+  const days = cur ? clone(cur.days) : emptyWeek();
+  fn(days);
+  for (let i = 0; i < 7; i++) days[i] = uniq((days[i] || []).filter(id => app.types.some(x => x.id === id)));
+  upsertVersion(app, t, days);
+  savePlan(app);
+}
+function dayAdd(date, tid){ const app = clone(S.app); setOverride(app, date, rawPlanned(date, app).concat([tid])); savePlan(app); toast('האימון נוסף ליום הזה בלבד'); render(); }
+function dayRemove(date, tid){ const app = clone(S.app); setOverride(app, date, rawPlanned(date, app).filter(x => x !== tid)); savePlan(app); render(); }
+function dayReset(date){ const app = clone(S.app); if (app.overrides) delete app.overrides[date]; savePlan(app); toast('היום חזר ללוח הקבוע'); render(); }
+function moveOnce(src, tgt){
+  const app = clone(S.app);
+  const moving = rawPlanned(src, app);
+  setOverride(app, tgt, rawPlanned(tgt, app).concat(moving));
+  setOverride(app, src, []);
+  savePlan(app);
+}
+function movePermanent(src, tgt){
+  const app = clone(S.app), t = todayKey();
+  const ws = weekdayOf(src), wt = weekdayOf(tgt);
+  const cur = versionFor(t, app);
+  const days = cur ? clone(cur.days) : emptyWeek();
+  days[wt] = uniq(days[wt].concat(days[ws]));
+  days[ws] = [];
+  upsertVersion(app, t, days);
+  if (app.overrides) { delete app.overrides[src]; delete app.overrides[tgt]; }
+  savePlan(app);
+}
+
+/* ---------- day records ---------- */
+function recItemFrom(c){
+  if (c.kind === 'cardio') return {id:c.id, kind:'cardio', name:c.name, mode:c.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:num(c.minutes), walk:clone(c.walk || {}), run:clone(c.run || {}), cooldown:clone(c.cooldown || {}), notes:c.notes || '', done:false, result:emptyResult()};
+  return {id:c.id, kind:'strength', name:c.name, machine:c.machine || '', group:c.group || '', sets:num(c.sets), reps:num(c.reps), weight:num(c.weight), done:false};
+}
+function frozenSession(tid){
+  const t = typeById(tid); if (!t) return null;
+  return {typeId:tid, name:t.name, items:t.items.map(catById).filter(Boolean).map(recItemFrom)};
+}
+function virtualFor(date, tids){
+  return {schema:2, date, createdAt:nowISO(), updatedAt:nowISO(), sessions:tids.map(frozenSession).filter(Boolean), note:''};
+}
+function liveItems(t, rs){
+  const prev = new Map(((rs && rs.items) || []).map(i => [i.id, i]));
+  const items = [];
+  t.items.forEach(cid => {
+    const c = catById(cid); if (!c) return;
+    const p = prev.get(cid); prev.delete(cid);
+    if (c.kind === 'cardio') {
+      const src = (p && p.done && p.kind === 'cardio') ? p : c;
+      items.push({id:cid, kind:'cardio', name:src.name || c.name, mode:src.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:num(src.minutes), walk:clone(src.walk || {}), run:clone(src.run || {}), cooldown:clone(src.cooldown || {}), notes:src.notes || '', done:!!(p && p.done), result:Object.assign(emptyResult(), (p && p.result) || {})});
+    } else {
+      const done = !!(p && p.done);
+      items.push({id:cid, kind:'strength', name:c.name, machine:c.machine || '', group:c.group || '', sets:num(c.sets), reps:num(c.reps), weight:done ? (p.weight != null ? p.weight : num(c.weight)) : num(c.weight), done});
+    }
+  });
+  prev.forEach(p => { if (p.done || (p.kind === 'cardio' && hasResult(p.result))) items.push(clone(p)); });
+  return items;
+}
+function buildLiveSessions(date, rec){
+  const out = [];
+  const recS = new Map(((rec && rec.sessions) || []).map(s => [s.typeId, s]));
+  plannedTypes(date).forEach(tid => {
+    const t = typeById(tid); if (!t) return;
+    const rs = recS.get(tid); recS.delete(tid);
+    out.push({typeId:tid, name:t.name, items:liveItems(t, rs)});
+  });
+  recS.forEach(rs => { if ((rs.items || []).some(i => i.done || (i.kind === 'cardio' && hasResult(i.result)))) out.push(clone(rs)); });
+  return out;
+}
+function counts(sessions){ let d = 0, n = 0; sessions.forEach(s => (s.items || []).forEach(i => { n++; if (i.done) d++; })); return {d, n}; }
+function findItem(doc, tid, iid){ const s = doc.sessions.find(x => x.typeId === tid); return s ? s.items.find(i => i.id === iid) || null : null; }
+function isEmptyRecord(doc){ return !(doc.note && doc.note.trim()) && !doc.sessions.some(s => s.items.some(i => i.done || (i.kind === 'cardio' && hasResult(i.result)))); }
+function sameContent(a, b){ return same(Object.assign({}, a, {updatedAt:0, createdAt:0}), Object.assign({}, b, {updatedAt:0, createdAt:0})); }
+function liveDoc(prev, fn){
+  const k = todayKey();
+  const doc = {schema:2, date:k, createdAt:(prev && prev.createdAt) || nowISO(), updatedAt:nowISO(), sessions:buildLiveSessions(k, prev), note:(prev && prev.note) || ''};
+  if (fn) fn(doc);
+  return doc;
+}
+function mutateToday(fn){
+  const k = todayKey(), prev = S.workouts[k] || null;
+  const doc = liveDoc(prev, fn);
+  if (isEmptyRecord(doc)) { if (prev) removeRecord(k); return; }
+  if (prev && sameContent(prev, doc)) return;
+  commitRecord(doc);
+}
+function pastDoc(k){ return S.workouts[k] || (S.virtual && S.virtual.date === k ? S.virtual : null); }
+function mutatePast(k, fn){
+  const prev = pastDoc(k); if (!prev) return;
+  const doc = clone(prev); fn(doc); doc.updatedAt = nowISO();
+  if (S.virtual && S.virtual.date === k) S.virtual = null;
+  commitRecord(doc);
+}
+function dayState(k){
+  const t = todayKey(), rec = S.workouts[k] || null;
+  if (k === t) {
+    const ss = buildLiveSessions(k, rec), c = counts(ss);
+    if (!ss.length && !rec) return 'rest';
+    if (c.n && c.d === c.n) return 'full';
+    return (c.d > 0 || rec) ? 'part' : 'planned';
+  }
+  if (rec) { const c = counts(rec.sessions); return c.n && c.d === c.n ? 'full' : 'part'; }
+  if (!plannedTypes(k).length) return 'rest';
+  return k < t ? 'missed' : 'planned';
+}
+const STATE_LABEL = {full:'האימון הושלם', part:'בוצע חלקית', planned:'מתוכנן אימון', missed:'לא נרשם אימון', rest:'יום מנוחה'};
+
+/* ---------- saving ---------- */
+function commitApp(app){ S.app = app; persist('app', null, app); }
+function commitRecord(doc){ S.workouts[doc.date] = doc; persist('w', doc.date, doc); }
+function removeRecord(k){ delete S.workouts[k]; persist('w', k, null); }
+function persist(kind, k, data){
+  const ok = kind === 'app' ? store.set('app', data) : (data ? store.set('w:' + k, data) : store.del('w:' + k));
+  if (ok) { setStatus('local'); requestPersist(); return; }
+  setStatus(S.storageOK ? 'quota' : 'memory');
+  if (!S.warned) { S.warned = true; toast(S.storageOK ? 'אין מקום לשמירה במכשיר. כדאי לשמור גיבוי לקובץ.' : 'הדפדפן הזה לא מאפשר לשמור נתונים.'); }
+}
+function savePlan(app){ app.updatedAt = nowISO(); commitApp(app); if (S.workouts[todayKey()]) mutateToday(null); }
+let askedPersist = false;
+function requestPersist(){
+  if (askedPersist) return; askedPersist = true;
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
+}
+function loadAll(){
+  S.storageOK = storageWorks();
+  S.app = normApp(store.get('app'));
+  S.workouts = {};
+  store.keys().forEach(k => { if (k.indexOf('w:') === 0) { const r = normRec(store.get(k)); if (r) S.workouts[r.date] = r; } });
+  const m = store.get('meta'); S.meta = m && typeof m === 'object' ? m : {};
+  S.ready = true;
+  setStatus(S.storageOK ? 'local' : 'memory');
+}
+function saveMeta(){ store.set('meta', S.meta); }
+
+/* ---------- status + toast ---------- */
+const STATUS = { local:['ok','נשמר במכשיר'], memory:['err','לא נשמר'], quota:['err','אין מקום לשמירה'] };
+function paintStatus(el){ const s = STATUS[S.status] || STATUS.local; el.className = 'status st-' + s[0]; el.textContent = s[1]; }
+function statusEl(){ const el = h('span', {'data-status':''}); paintStatus(el); return el; }
+function setStatus(s){ if (S.status === s) return; S.status = s; D.querySelectorAll('[data-status]').forEach(paintStatus); }
+let toastT = null;
+function toast(msg){ const t = D.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+
+/* ---------- rendering ---------- */
+function render(){
+  const view = D.getElementById('view');
+  const ae = D.activeElement;
+  const fid = ae && ae.id && view.contains(ae) ? ae.id : null;
+  let sel = null;
+  if (fid && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) { try { sel = [ae.selectionStart, ae.selectionEnd]; } catch (e) {} }
+  const y = window.scrollY;
+  let nodes;
+  if (!S.app) nodes = viewWelcome();
+  else if (S.tab === 'schedule') nodes = viewSchedule();
+  else if (S.tab === 'types') nodes = S.sub ? viewSub() : viewTypes();
+  else if (S.tab === 'history') nodes = viewHistory();
+  else nodes = viewWeek();
+  nodes = [].concat(nodes);
+  if (S.updateReady) nodes.unshift(updateBanner());
+  view.replaceChildren.apply(view, nodes.filter(Boolean));
+  const tabs = D.getElementById('tabs');
+  tabs.hidden = !(S.ready && S.app);
+  tabs.querySelectorAll('.tab').forEach(b => { if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  if (fid) {
+    const el = D.getElementById(fid);
+    if (el && el !== D.activeElement && !el.disabled) {
+      try { el.focus({preventScroll:true}); } catch (e) {}
+      if (sel && sel[0] != null && el.setSelectionRange) { try { el.setSelectionRange(sel[0], sel[1]); } catch (e) {} }
+    }
+  }
+  if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
+}
+function setTab(t){
+  S.tab = t; S.sub = null; S.draft = null; S.confirm = null; S.dayEdit = null; S.moveTarget = null;
+  if (t === 'week') { S.pastEdit = null; S.virtual = null; }
+  render(); window.scrollTo(0, 0);
+}
+function selectDay(k){
+  S.sel = k; S.dayEdit = null; S.moveTarget = null; S.moveKind = 'once'; S.pastEdit = null; S.virtual = null; S.confirm = null;
+  render(); window.scrollTo(0, 0);
+}
+
+function emptyCard(title, text){ return h('div', {class:'empty'}, h('p', {class:'empty-t', text:title}), text ? h('p', {text}) : null); }
+function confirmBox(text, yesLabel, onYes){
+  return h('div', {class:'confirm', role:'alertdialog', 'aria-label':text},
+    h('p', {text}),
+    h('div', {class:'factions'},
+      h('button', {class:'btn danger-solid', type:'button', id:'cf-yes', onclick:onYes}, yesLabel),
+      h('button', {class:'btn', type:'button', id:'cf-no', onclick:() => { S.confirm = null; S.restorePending = null; render(); }}, 'ביטול')));
+}
+function selectWrap(sel){ return h('div', {class:'selwrap'}, sel, h('span', {class:'selarrow', html:I.caret})); }
+function typePicker(id, label, exclude, onPick){
+  const opts = types().filter(t => exclude.indexOf(t.id) < 0);
+  if (!opts.length) return null;
+  const sel = h('select', {id, 'aria-label':label, onchange:e => { const v = e.target.value; if (v) onPick(v); }});
+  sel.append(h('option', {value:'', text:label}));
+  opts.forEach(t => sel.append(h('option', {value:t.id, text:t.name || 'אימון בלי שם'})));
+  return selectWrap(sel);
+}
+
+/* ---------- notices ---------- */
+function updateBanner(){
+  return h('div', {class:'upd', role:'status'}, h('span', {text:'גרסה חדשה של האפליקציה מוכנה'}),
+    h('button', {class:'btn small', type:'button', id:'upd-go', onclick:applyUpdate}, 'עדכון עכשיו'));
+}
+function installCard(){
+  if (!isIOS() || isStandalone()) return null;
+  return h('div', {class:'install'},
+    h('p', {class:'empty-t', text:'קודם מוסיפים למסך הבית'}),
+    h('p', {text:'באייפון, אפליקציה שנפתחת ממסך הבית שומרת את הנתונים בנפרד מספארי. כדאי להוסיף אותה לפני שמזינים נתונים: פותחים את תפריט השיתוף של ספארי, בוחרים בהוספה למסך הבית, ופותחים את האפליקציה מהסמל החדש.'}));
+}
+function lastBackupText(){
+  const last = S.meta.lastBackupAt;
+  return last ? 'הגיבוי האחרון נשמר ב־' + fDate.format(new Date(last)) + '.' : 'עוד לא נשמר גיבוי.';
+}
+function needsBackup(){
+  if (!S.app || !Object.keys(S.workouts).length) return false;
+  const last = S.meta.lastBackupAt || '';
+  let latest = S.app.updatedAt || '';
+  Object.keys(S.workouts).forEach(k => { const u = S.workouts[k].updatedAt || ''; if (u > latest) latest = u; });
+  if (latest <= last) return false;
+  if (!last) return true;
+  return (Date.now() - Date.parse(last)) > 7 * 864e5;
+}
+function backupReminder(id){
+  if (!needsBackup()) return null;
+  const last = S.meta.lastBackupAt;
+  return h('section', {class:'remind', id},
+    h('p', {class:'empty-t', text:'כדאי לשמור גיבוי'}),
+    h('p', {text:last
+      ? 'מאז הגיבוי האחרון, ב־' + fDM.format(new Date(last)) + ', נוספו אימונים שנשמרו רק במכשיר הזה.'
+      : 'האימונים נשמרים רק במכשיר הזה. גיבוי לקובץ בתיקייה שמסתנכרנת למחשב שומר עליהם גם אם המכשיר יוחלף.'}),
+    h('button', {class:'btn primary', type:'button', id:id + '-btn', onclick:saveBackupFile}, 'שמירת גיבוי לקובץ'));
+}
+
+/* ---------- welcome ---------- */
+function viewWelcome(){
+  const restore = h('div', {class:'choice'},
+    h('button', {class:'btn', type:'button', id:'start-restore', 'aria-expanded':S.restoreOpen ? 'true' : 'false', onclick:toggleRestore}, 'שחזור מגיבוי'),
+    h('p', {class:'hint', text:'טוענים קובץ גיבוי של האפליקציה, כולל המכשירים, המשקלים, הלוח וההיסטוריה.'}));
+  if (S.restoreOpen) restore.append(restorePanel());
+  return [h('section', {class:'welcome'},
+    h('h1', {class:'wtitle', text:'My Fitness App'}),
+    h('p', {class:'lede', text:'צ׳קליסט לכל אימון בחדר הכושר: המכשירים, המשקלים וההליכון, לפי לוח שבועי שאפשר לשנות תוך כדי תנועה. כל אימון נשמר עם היום והתאריך שלו.'}),
+    installCard(),
+    h('p', {class:'note', text:S.storageOK
+      ? 'הנתונים נשמרים במכשיר הזה בלבד, בלי חשבון ובלי מנוי. אפשר לשמור גיבוי לקובץ ולשחזר אותו בכל מכשיר.'
+      : 'הדפדפן הזה לא מאפשר לשמור נתונים, והם יימחקו כשהדף ייסגר.'}),
+    h('div', {class:'choice'},
+      h('button', {class:'btn primary', type:'button', id:'start-sample', onclick:() => startWith('sample')}, 'להתחיל עם תוכנית לדוגמה'),
+      h('p', {class:'hint', text:'אימון אחד עם 11 מכשירים של פרופיט והליכון, כולל סטים וחזרות. המשקלים ריקים, וממלאים אותם באימון הראשון.'})),
+    h('div', {class:'choice'},
+      h('button', {class:'btn', type:'button', id:'start-empty', onclick:() => startWith('empty')}, 'להתחיל מאפס'),
+      h('p', {class:'hint', text:'יוצרים בעצמכם סוגי אימונים ומכשירים, עם מספר, תיאור ומשקל.'})),
+    restore)];
+}
+function startWith(kind){
+  const now = nowISO();
+  const app = {schema:2, catalog:[], types:[], schedule:[], overrides:{}, createdAt:now, updatedAt:now};
+  if (kind === 'sample') {
+    app.catalog = clone(SAMPLE_CATALOG).map(c => { if (c.kind === 'strength') c.weight = null; return c; });
+    app.types = [{id:'t1', name:'אימון מלא', items:app.catalog.map(c => c.id)}];
+  }
+  commitApp(app);
+  S.restoreOpen = false;
+  S.tab = kind === 'sample' ? 'schedule' : 'types';
+  render(); window.scrollTo(0, 0);
+  toast(kind === 'sample' ? 'עכשיו בוחרים באילו ימים מתאמנים' : 'מתחילים ביצירת סוג אימון');
+}
+
+/* ---------- week view ---------- */
+function weekLabel(ws){
+  const n = Math.round(dayDiff(weekStart(todayKey()), ws) / 7);
+  if (n === 0) return 'השבוע';
+  if (n === 1) return 'השבוע הבא';
+  if (n === -1) return 'השבוע שעבר';
+  if (n === 2) return 'בעוד שבועיים';
+  if (n === -2) return 'לפני שבועיים';
+  return n > 0 ? 'בעוד ' + n + ' שבועות' : 'לפני ' + (-n) + ' שבועות';
+}
+function rangeText(ws){
+  const a = keyDate(ws), b = keyDate(addDays(ws, 6));
+  try { if (fDate.formatRange) return fDate.formatRange(a, b); } catch (e) {}
+  return fDate.format(a) + ' עד ' + fDate.format(b);
+}
+function viewWeek(){
+  const t = todayKey(), sel = S.sel, ws = weekStart(sel);
+  const strip = h('div', {class:'strip', role:'tablist', 'aria-label':'ימי השבוע', onkeydown:stripKeys});
+  for (let i = 0; i < 7; i++) {
+    const k = addDays(ws, i), st = dayState(k);
+    strip.append(h('button', {class:'dcell st-' + st + (k === t ? ' today' : ''), type:'button', role:'tab', id:'d-' + k,
+      'aria-selected':k === sel ? 'true' : 'false', tabindex:k === sel ? '0' : '-1',
+      'aria-label':fDay.format(keyDate(k)) + ', ' + fDM.format(keyDate(k)) + (k === t ? ', היום' : '') + ', ' + STATE_LABEL[st],
+      onclick:() => selectDay(k)},
+      h('span', {class:'dl', text:WD_LETTER[i]}), h('span', {class:'dn', text:String(keyDate(k).getDate())}), h('span', {class:'dm'})));
+  }
+  const showToday = sel !== t;
+  return [
+    h('header', {class:'wk'},
+      h('div', {class:'wk-top'},
+        h('div', {class:'wk-titles'}, h('div', {class:'wk-label', text:weekLabel(ws)}), h('div', {class:'wk-range', text:rangeText(ws)})),
+        h('div', {class:'wk-nav'},
+          h('button', {class:'wk-btn', type:'button', id:'wk-prev', 'aria-label':'השבוע הקודם', html:I.right, onclick:() => selectDay(addDays(sel, -7))}),
+          showToday ? h('button', {class:'wk-btn', type:'button', id:'wk-today', onclick:() => selectDay(t)}, 'היום') : null,
+          h('button', {class:'wk-btn', type:'button', id:'wk-next', 'aria-label':'השבוע הבא', html:I.left, onclick:() => selectDay(addDays(sel, 7))}))),
+      strip),
+    dayPanel(sel),
+    sel === t ? backupReminder('remind-week') : null
+  ];
+}
+function stripKeys(e){
+  let d = 0;
+  if (e.key === 'ArrowLeft') d = 1; else if (e.key === 'ArrowRight') d = -1; else return;
+  e.preventDefault(); selectDay(addDays(S.sel, d));
+  const el = D.getElementById('d-' + S.sel); if (el) el.focus();
+}
+function dayPanel(k){
+  const t = todayKey(), rel = dayDiff(t, k);
+  const relText = rel === 0 ? 'היום' : rel === 1 ? 'מחר' : rel === -1 ? 'אתמול' : null;
+  const panel = h('section', {class:'day', id:'daypanel', 'aria-label':fDay.format(keyDate(k)) + ', ' + fDate.format(keyDate(k))},
+    h('div', {class:'dtitle'}, h('h1', {text:fDay.format(keyDate(k))}), relText ? h('span', {class:'rel' + (rel === 0 ? '' : ' soft'), text:relText}) : null),
+    h('div', {class:'dsub'}, h('span', {text:fDate.format(keyDate(k))}), statusEl()));
+  if (k === t) appendToday(panel, k);
+  else if (k < t) appendPast(panel, k);
+  else appendFuture(panel, k);
+  return panel;
+}
+function progressBlock(d, n, live){
+  const complete = n > 0 && d === n;
+  return h('div', {class:'prog'},
+    live ? h('div', {class:'bar', role:'progressbar', 'aria-label':'התקדמות האימון', 'aria-valuemin':'0', 'aria-valuemax':String(n), 'aria-valuenow':String(d)},
+      h('div', {class:'fill', style:'width:' + (n ? Math.round(d / n * 100) : 0) + '%'})) : null,
+    h('div', {class:'count' + (complete ? ' complete' : ''), text:complete ? (live ? 'האימון הושלם, כל הכבוד' : 'כל התרגילים בוצעו') : d + ' מתוך ' + n + ' בוצעו'}));
+}
+function restCard(k){
+  const card = h('div', {class:'empty'}, h('p', {class:'empty-t', text:'יום מנוחה'}));
+  if (!types().length) {
+    card.append(h('p', {text:'כדי להתחיל, יוצרים סוג אימון עם המכשירים שלך.'}),
+      h('button', {class:'btn primary', type:'button', id:'go-types', onclick:() => setTab('types')}, 'לעמוד האימונים'));
+    return card;
+  }
+  if (scheduleEmpty()) card.append(h('p', {text:'עוד לא נקבע לוח קבוע. אפשר לקבוע באילו ימים מתאמנים, או להוסיף אימון רק ליום הזה.'}),
+    h('button', {class:'btn', type:'button', id:'go-sched', onclick:() => setTab('schedule')}, 'לקביעת הלוח הקבוע'));
+  else if (hasOverride(k)) card.append(h('p', {text:'היום הזה שונה באופן חד פעמי מהלוח הקבוע.'}),
+    h('button', {class:'btn', type:'button', id:'reset-' + k, onclick:() => dayReset(k)}, 'חזרה ללוח הקבוע'));
+  const p = typePicker('add-' + k, 'הוספת אימון ליום הזה בלבד', [], tid => dayAdd(k, tid));
+  if (p) card.append(p);
+  return card;
+}
+function appendToday(panel, k){
+  const rec = S.workouts[k] || null;
+  const sessions = buildLiveSessions(k, rec);
+  if (!sessions.length) { panel.append(restCard(k)); return; }
+  const c = counts(sessions);
+  panel.append(progressBlock(c.d, c.n, true));
+  if (hasOverride(k)) panel.append(h('p', {class:'note', text:'היום הזה שונה באופן חד פעמי מהלוח הקבוע.'}));
+  sessions.forEach(s => panel.append(sessionBlock(s, 'live', k)));
+  panel.append(noteBlock(rec ? rec.note : '', 'note-' + k, v => mutateToday(doc => { doc.note = v; })));
+  panel.append(dayEditor(k));
+}
+function appendPast(panel, k){
+  const rec = S.workouts[k] || null;
+  const editing = S.pastEdit === k;
+  const doc = pastDoc(k);
+  if (!doc) {
+    const planned = plannedTypes(k);
+    const card = h('div', {class:'empty'});
+    if (planned.length) {
+      card.append(h('p', {class:'empty-t', text:'לא נרשם אימון ביום הזה'}),
+        h('p', {text:'היה מתוכנן: ' + planned.map(id => typeById(id).name).join(', ')}),
+        h('button', {class:'btn primary', type:'button', id:'log-' + k, onclick:() => { S.virtual = virtualFor(k, planned); S.pastEdit = k; render(); }}, 'רישום האימון'));
+    } else {
+      card.append(h('p', {class:'empty-t', text:'יום מנוחה'}), h('p', {text:'לא היה מתוכנן אימון ולא נרשם אימון.'}));
+      const p = typePicker('logp-' + k, 'רישום אימון שנעשה ביום הזה', [], tid => { S.virtual = virtualFor(k, [tid]); S.pastEdit = k; render(); });
+      if (p) card.append(p);
+    }
+    panel.append(card);
+    return;
+  }
+  const c = counts(doc.sessions);
+  panel.append(progressBlock(c.d, c.n, false));
+  if (!rec) panel.append(h('p', {class:'note', text:'הרישום יישמר מהסימון הראשון.'}));
+  doc.sessions.forEach(s => panel.append(sessionBlock(s, editing ? 'edit' : 'view', k)));
+  if (editing) {
+    const p = typePicker('addsess-' + k, 'הוספת אימון לרישום', doc.sessions.map(s => s.typeId), tid => {
+      mutatePast(k, x => { if (!x.sessions.some(s => s.typeId === tid)) { const s = frozenSession(tid); if (s) x.sessions.push(s); } });
+      render();
+    });
+    if (p) panel.append(p);
+    panel.append(noteBlock(doc.note, 'note-' + k, v => mutatePast(k, x => { x.note = v; })));
+  } else if (doc.note) {
+    panel.append(h('section', {class:'notecard'}, h('h2', {class:'nlabel', text:'הערות'}), h('p', {class:'ntext', text:doc.note})));
+  }
+  if (S.confirm === 'del-' + k) {
+    panel.append(confirmBox('למחוק את הרישום של ' + fDay.format(keyDate(k)) + ', ' + fDM.format(keyDate(k)) + '? אי אפשר לבטל את המחיקה.', 'מחיקה',
+      () => { removeRecord(k); S.confirm = null; S.pastEdit = null; toast('הרישום נמחק'); render(); }));
+    return;
+  }
+  panel.append(h('div', {class:'dact'},
+    h('button', {class:'btn', type:'button', id:'pe-' + k, onclick:() => {
+      if (editing) { S.pastEdit = null; if (!rec) S.virtual = null; } else S.pastEdit = k;
+      S.confirm = null; render();
+    }}, editing ? 'סיום עריכה' : 'עריכת הרישום'),
+    rec ? h('button', {class:'btn danger', type:'button', id:'del-' + k, onclick:() => { S.confirm = 'del-' + k; render(); focusSoon('cf-no'); }}, 'מחיקת הרישום') : null));
+}
+function appendFuture(panel, k){
+  const planned = plannedTypes(k);
+  if (!planned.length) { panel.append(restCard(k)); return; }
+  if (hasOverride(k)) panel.append(h('p', {class:'note', text:'היום הזה שונה באופן חד פעמי מהלוח הקבוע.'}));
+  planned.forEach(tid => { const s = frozenSession(tid); if (s) panel.append(sessionBlock(s, 'preview', k)); });
+  panel.append(dayEditor(k));
+}
+function dayEditor(k){
+  const open = S.dayEdit === k;
+  const wrap = h('section', {class:'dedit'},
+    h('button', {class:'btn', type:'button', id:'de-' + k, 'aria-expanded':open ? 'true' : 'false',
+      onclick:() => { S.dayEdit = open ? null : k; S.moveTarget = null; S.moveKind = 'once'; render(); }}, open ? 'סגירת השינויים' : 'שינוי ליום הזה'));
+  if (!open) return wrap;
+  const t = todayKey(), planned = plannedTypes(k);
+  const dayTxt = fDay.format(keyDate(k)) + ', ' + fDM.format(keyDate(k));
+  const panel = h('div', {class:'panel'}, h('h3', {text:'האימונים ביום הזה'}));
+  const chips = h('div', {class:'chips'});
+  planned.forEach(tid => chips.append(h('span', {class:'tchip'}, h('span', {text:typeById(tid).name}),
+    h('button', {type:'button', id:'rm-' + tid, 'aria-label':'הסרת ' + typeById(tid).name + ' מהיום הזה בלבד', html:I.x, onclick:() => dayRemove(k, tid)}))));
+  if (!planned.length) chips.append(h('span', {class:'rest', text:'אין אימונים'}));
+  panel.append(chips);
+  const p = typePicker('dadd-' + k, 'הוספת אימון ליום הזה', planned, tid => dayAdd(k, tid));
+  if (p) panel.append(p);
+  panel.append(h('p', {class:'hint', text:'הוספה והסרה כאן חלות רק על ' + dayTxt + '.'}));
+  if (planned.length) {
+    panel.append(h('h3', {text:'העברת האימונים ליום אחר'}));
+    const ws = weekStart(k);
+    const days = h('div', {class:'days7', role:'group', 'aria-label':'יום היעד'});
+    for (let i = 0; i < 7; i++) {
+      const dk = addDays(ws, i);
+      days.append(h('button', {type:'button', id:'mt-' + dk, disabled:dk === k || dk < t, 'aria-pressed':S.moveTarget === dk ? 'true' : 'false',
+        'aria-label':fDay.format(keyDate(dk)) + ', ' + fDM.format(keyDate(dk)), onclick:() => { S.moveTarget = dk; render(); }},
+        h('span', {class:'m-l', text:WD_LETTER[i]}), h('span', {class:'m-n', text:String(keyDate(dk).getDate())})));
+    }
+    panel.append(days);
+    const canPerm = templateFor(k).some(id => typeById(id));
+    const kind = canPerm ? S.moveKind : 'once';
+    panel.append(h('div', {class:'seg', role:'group', 'aria-label':'סוג השינוי'},
+      h('button', {type:'button', id:'mk-once', 'aria-pressed':kind === 'once' ? 'true' : 'false', onclick:() => { S.moveKind = 'once'; render(); }}, 'רק השבוע'),
+      h('button', {type:'button', id:'mk-perm', 'aria-pressed':kind === 'perm' ? 'true' : 'false', disabled:!canPerm, onclick:() => { S.moveKind = 'perm'; render(); }}, 'קבוע, מעכשיו')));
+    panel.append(h('p', {class:'hint', text:kind === 'perm'
+      ? 'הלוח הקבוע ישתנה מהיום והלאה: האימונים של יום ' + WD_NAME[weekdayOf(k)] + ' יעברו ליום שנבחר.'
+      : (canPerm ? 'בשבוע הבא הלוח חוזר לסדר הקבוע.' : 'ביום הזה אין אימון בלוח הקבוע, ולכן אפשר להעביר רק באופן חד פעמי.')}));
+    panel.append(h('button', {class:'btn primary', type:'button', id:'mv-go', disabled:!S.moveTarget, onclick:() => doMove(k, kind)},
+      S.moveTarget ? 'העברה ל' + fDay.format(keyDate(S.moveTarget)) : 'בחירת יום להעברה'));
+  }
+  if (hasOverride(k)) panel.append(h('button', {class:'btn', type:'button', id:'rst-' + k, onclick:() => dayReset(k)}, 'חזרה ללוח הקבוע ביום הזה'));
+  wrap.append(panel);
+  return wrap;
+}
+function doMove(k, kind){
+  const tgt = S.moveTarget; if (!tgt) return;
+  const perm = kind === 'perm';
+  if (perm) movePermanent(k, tgt); else moveOnce(k, tgt);
+  S.dayEdit = null; S.moveTarget = null; S.moveKind = 'once'; S.sel = tgt;
+  render(); window.scrollTo(0, 0);
+  toast(perm ? 'הלוח הקבוע עודכן מהיום והלאה' : 'האימונים הועברו ל' + fDay.format(keyDate(tgt)) + ', רק השבוע');
+}
+
+function sessionBlock(s, mode, k){
+  const sn = s.items.filter(i => i.kind !== 'cardio').length, cn = s.items.length - sn;
+  const head = h('div', {class:'shead'}, h('h2', {text:s.name || 'אימון'}), h('span', {class:'smeta', text:itemsSummary(sn, cn)}));
+  if (mode === 'edit') head.append(h('button', {class:'btn small ghost', type:'button', id:'rs-' + s.typeId,
+    onclick:() => { mutatePast(k, x => { x.sessions = x.sessions.filter(y => y.typeId !== s.typeId); }); render(); }}, 'הסרה מהרישום'));
+  const list = h('div', {class:'list'});
+  let lg = null;
+  s.items.forEach(it => {
+    if (it.kind === 'cardio') { lg = null; list.append(cardioRow(it, s.typeId, mode, k)); return; }
+    const g = it.group || '';
+    if (g !== lg) { if (g) list.append(h('div', {class:'group', text:g})); lg = g; }
+    list.append(strengthRow(it, s.typeId, mode, k));
+  });
+  if (!s.items.length) list.append(h('p', {class:'note', text:'אין עדיין תרגילים באימון הזה. מוסיפים אותם בלשונית אימונים.'}));
+  return h('section', {class:'sess', 'aria-label':s.name}, head, list);
+}
+function rowClass(it, mode){
+  return 'row' + (it.kind === 'cardio' ? ' cardio' : '') + (it.done ? ' done' : '') + (mode === 'live' ? ' live' : '') +
+    (mode === 'view' && !it.done ? ' skipped' : '') + (mode === 'preview' ? ' preview' : '');
+}
+function tickBtn(key, done, name, onClick){
+  return h('button', {class:'tick', type:'button', id:'tick-' + key, 'aria-pressed':done ? 'true' : 'false',
+    'aria-label':(done ? 'ביטול סימון: ' : 'סימון: ') + name, html:I.check, onclick:onClick});
+}
+function stateMark(done){ return h('span', {class:'state ' + (done ? 'yes' : 'no'), role:'img', 'aria-label':done ? 'בוצע' : 'לא בוצע', html:done ? I.check : I.dash}); }
+function nameLine(name, machine){
+  const el = h('div', {class:'name'}, h('span', {class:'nm', text:name}));
+  if (machine) el.append(h('span', {class:'num', text:'מכשיר ' + machine}));
+  return el;
+}
+function strengthRow(it, tid, mode, k){
+  const key = tid + '-' + it.id, interactive = mode === 'live' || mode === 'edit';
+  const row = h('div', {class:rowClass(it, mode), id:'row-' + key});
+  if (interactive) row.append(tickBtn(key, it.done, it.name, () => toggleItem(mode, k, tid, it.id)));
+  else if (mode === 'view') row.append(stateMark(it.done));
+  const body = h('div', {class:'body'}, nameLine(it.name, it.machine));
+  const st = setsText(it.sets, it.reps);
+  if (st) body.append(h('div', {class:'meta', text:st}));
+  if (mode === 'live') { const c = catById(it.id); if (c && c.desc) body.append(h('div', {class:'desc', text:c.desc})); }
+  if (interactive) body.append(weightStepper(key, it, (v, rr) => setWeight(mode, k, tid, it.id, v, rr)));
+  else body.append(h('div', {class:'meta', text:it.weight != null ? 'משקל ' + fmtNum(it.weight) + ' ק״ג' : 'בלי משקל'}));
+  if (mode === 'view' && !it.done) body.append(h('div', {class:'skip', text:'לא בוצע'}));
+  row.append(body);
+  return row;
+}
+function weightStepper(key, it, onSet){
+  const id = 'w-' + key;
+  const cur = () => { const el = D.getElementById(id); return el ? num(el.value) : num(it.weight); };
+  return h('div', {class:'wrow'},
+    h('span', {class:'wlab', text:'משקל'}),
+    h('div', {class:'stepper', dir:'ltr'},
+      h('button', {class:'step', type:'button', id:'wm-' + key, 'aria-label':'הורדת קילו, ' + it.name, text:'−',
+        onclick:() => { const c = cur(); if (c == null) return; onSet(Math.max(0, round2(c - 1)), true); }}),
+      h('input', {class:'wval', id, inputmode:'decimal', enterkeyhint:'done', autocomplete:'off', maxlength:'6',
+        value:it.weight == null ? '' : fmtNum(it.weight), 'aria-label':'משקל בק״ג, ' + it.name, onkeydown:enterBlur,
+        oninput:e => { const v = e.target.value.trim(); if (v === '') { onSet(null, false); return; } const n = num(v); if (n != null && n >= 0) onSet(round2(n), false); }}),
+      h('button', {class:'step', type:'button', id:'wp-' + key, 'aria-label':'הוספת קילו, ' + it.name, text:'+',
+        onclick:() => { const c = cur(); onSet(round2((c == null ? 0 : c) + 1), true); }})),
+    h('span', {class:'unit', text:'ק״ג'}));
+}
+function toggleItem(mode, k, tid, iid){
+  if (mode === 'live') mutateToday(doc => {
+    const it = findItem(doc, tid, iid); if (!it) return;
+    it.done = !it.done;
+    if (!it.done && it.kind === 'strength') { const c = catById(iid); if (c) it.weight = num(c.weight); }
+  });
+  else mutatePast(k, doc => { const it = findItem(doc, tid, iid); if (it) it.done = !it.done; });
+  render();
+}
+function setWeight(mode, k, tid, iid, v, rerender){
+  if (mode === 'live') {
+    const app = clone(S.app), c = app.catalog.find(x => x.id === iid);
+    if (c && c.kind === 'strength') { c.weight = v; app.updatedAt = nowISO(); commitApp(app); }
+    if (S.workouts[todayKey()]) mutateToday(doc => doc.sessions.forEach(s => s.items.forEach(i => { if (i.id === iid && i.kind === 'strength') i.weight = v; })));
+  } else mutatePast(k, doc => { const it = findItem(doc, tid, iid); if (it) it.weight = v; });
+  if (rerender) render();
+}
+function cardioRow(it, tid, mode, k){
+  const key = tid + '-' + it.id, interactive = mode === 'live' || mode === 'edit';
+  const row = h('div', {class:rowClass(it, mode), id:'row-' + key});
+  if (interactive) row.append(tickBtn(key, it.done, it.name, () => toggleItem(mode, k, tid, it.id)));
+  else if (mode === 'view') row.append(stateMark(it.done));
+  const body = h('div', {class:'body'}, nameLine(it.name, ''));
+  cardioLines(it).forEach(l => body.append(h('div', {class:'meta', text:l})));
+  if (interactive) body.append(resultsForm(key, it.result || emptyResult(), (f, v) => setResult(mode, k, tid, it.id, f, v)));
+  else if (mode === 'view') {
+    const r = resultText(it.result);
+    if (r) body.append(h('div', {class:'res', text:r}));
+    if (!it.done) body.append(h('div', {class:'skip', text:'לא בוצע'}));
+  }
+  row.append(body);
+  return row;
+}
+function resultsForm(key, r, onSet){
+  const inp = (f, ph, mode, label) => h('input', {class:'rin', id:'r-' + key + '-' + f, inputmode:mode, autocomplete:'off', enterkeyhint:'done', maxlength:'6',
+    placeholder:ph, value:r[f] == null ? '' : fmtNum(r[f]), 'aria-label':label, onkeydown:enterBlur,
+    oninput:e => { const v = e.target.value.trim(); if (v === '') { onSet(f, null); return; } const n = num(v); if (n != null && n >= 0) onSet(f, round2(n)); }});
+  return h('div', {class:'results'},
+    h('div', {class:'rhead', text:'תוצאות מהמסך'}),
+    h('div', {class:'rgrid'},
+      h('div', {class:'rf'}, h('span', {class:'rl', text:'זמן'}),
+        h('div', {class:'time', dir:'ltr'}, inp('min', 'דק׳', 'numeric', 'זמן, דקות'), h('span', {class:'colon', text:':'}), inp('sec', 'שנ׳', 'numeric', 'זמן, שניות'))),
+      h('label', {class:'rf'}, h('span', {class:'rl', text:'מרחק (ק״מ)'}), inp('km', '', 'decimal', 'מרחק בקילומטרים')),
+      h('label', {class:'rf'}, h('span', {class:'rl', text:'דופק ממוצע'}), inp('hr', '', 'numeric', 'דופק ממוצע')),
+      h('label', {class:'rf'}, h('span', {class:'rl', text:'קלוריות'}), inp('kcal', '', 'numeric', 'קלוריות'))));
+}
+function setResult(mode, k, tid, iid, f, v){
+  if (mode === 'live') {
+    mutateToday(doc => {
+      const it = findItem(doc, tid, iid); if (!it || it.kind !== 'cardio') return;
+      it.result = Object.assign(emptyResult(), it.result || {}); it.result[f] = v;
+      if (!it.done && hasResult(it.result)) it.done = true;
+    });
+    patchToday();
+  } else mutatePast(k, doc => {
+    const it = findItem(doc, tid, iid); if (!it || it.kind !== 'cardio') return;
+    it.result = Object.assign(emptyResult(), it.result || {}); it.result[f] = v;
+  });
+}
+/* Updates today's progress and ticks in place, so typing in a field never rebuilds the page under the finger. */
+function patchToday(){
+  const k = todayKey();
+  if (S.tab !== 'week' || S.sel !== k) return;
+  const ss = buildLiveSessions(k, S.workouts[k] || null), c = counts(ss), complete = c.n > 0 && c.d === c.n;
+  const fill = D.querySelector('#daypanel .fill'); if (fill) fill.style.width = (c.n ? Math.round(c.d / c.n * 100) : 0) + '%';
+  const bar = D.querySelector('#daypanel .bar'); if (bar) bar.setAttribute('aria-valuenow', String(c.d));
+  const cnt = D.querySelector('#daypanel .count');
+  if (cnt) { cnt.textContent = complete ? 'האימון הושלם, כל הכבוד' : c.d + ' מתוך ' + c.n + ' בוצעו'; cnt.classList.toggle('complete', complete); }
+  ss.forEach(s => s.items.forEach(i => {
+    const key = s.typeId + '-' + i.id, row = D.getElementById('row-' + key), tb = D.getElementById('tick-' + key);
+    if (row) row.classList.toggle('done', !!i.done);
+    if (tb) { tb.setAttribute('aria-pressed', i.done ? 'true' : 'false'); tb.setAttribute('aria-label', (i.done ? 'ביטול סימון: ' : 'סימון: ') + i.name); }
+  }));
+  const cell = D.getElementById('d-' + k);
+  if (cell) cell.className = cell.className.replace(/st-\w+/, 'st-' + dayState(k));
+}
+function noteBlock(value, id, onInput){
+  const ta = h('textarea', {id, rows:'3', maxlength:'2000', placeholder:'איך הרגיש האימון, מה לשנות בפעם הבאה', oninput:e => onInput(e.target.value)});
+  ta.value = value || '';
+  return h('section', {class:'notecard'}, h('label', {class:'nlabel', for:id, text:'הערות ליום הזה'}), ta);
+}
+
+/* ---------- schedule view ---------- */
+function viewSchedule(){
+  const t = todayKey(), v = versionFor(t), days = v ? v.days : emptyWeek();
+  const out = [
+    h('header', {class:'vhead'}, h('h1', {text:'לוח קבוע'}), statusEl()),
+    h('p', {class:'lede', text:'מה מתוכנן בכל יום בשבוע. שינוי כאן חל מהיום והלאה, ואימונים שכבר נשמרו לא משתנים. כדי להזיז אימון רק בשבוע מסוים, פותחים את היום בלשונית השבוע.'})
+  ];
+  if (!types().length) {
+    out.push(h('div', {class:'empty'}, h('p', {class:'empty-t', text:'עוד אין סוגי אימונים'}),
+      h('p', {text:'קודם יוצרים סוג אימון, ואז משבצים אותו כאן בימים.'}),
+      h('button', {class:'btn primary', type:'button', id:'go-types2', onclick:() => setTab('types')}, 'לעמוד האימונים')));
+    return out;
+  }
+  const list = h('div', {class:'sched'}), twd = weekdayOf(t);
+  for (let i = 0; i < 7; i++) {
+    const ids = uniq((days[i] || []).filter(id => typeById(id)));
+    const chips = h('div', {class:'chips'});
+    ids.forEach(id => chips.append(h('span', {class:'tchip'}, h('span', {text:typeById(id).name}),
+      h('button', {type:'button', id:'sx-' + i + '-' + id, 'aria-label':'הסרת ' + typeById(id).name + ' מיום ' + WD_NAME[i], html:I.x,
+        onclick:() => { editSchedule(dd => { dd[i] = dd[i].filter(x => x !== id); }); render(); }}))));
+    if (!ids.length) chips.append(h('span', {class:'rest', text:'מנוחה'}));
+    const row = h('div', {class:'srow' + (i === twd ? ' today' : ''), id:'srow-' + i},
+      h('div', {class:'sday'}, h('span', {text:WD_NAME[i]}), i === twd ? h('span', {class:'stoday', text:'היום'}) : null), chips);
+    const p = typePicker('sadd-' + i, 'הוספת אימון ליום ' + WD_NAME[i], ids, tid => { editSchedule(dd => { dd[i] = (dd[i] || []).concat([tid]); }); render(); });
+    if (p) row.append(p);
+    list.append(row);
+  }
+  out.push(list);
+  const ov = Object.keys((S.app && S.app.overrides) || {}).filter(k => k >= t).sort();
+  if (ov.length) {
+    const sec = h('section', {class:'sec'}, h('h2', {text:'שינויים חד פעמיים'}));
+    const l = h('div', {class:'plist'});
+    ov.forEach(k => {
+      const names = plannedTypes(k).map(id => typeById(id).name);
+      l.append(h('div', {class:'prow'},
+        h('div', {class:'pmain'}, h('div', {class:'name', text:fDay.format(keyDate(k)) + ', ' + fDM.format(keyDate(k))}),
+          h('div', {class:'meta', text:names.length ? names.join(', ') : 'מנוחה'})),
+        h('div', {class:'pact'}, h('button', {class:'btn small', type:'button', id:'ovx-' + k, onclick:() => dayReset(k)}, 'ביטול השינוי'))));
+    });
+    sec.append(l);
+    out.push(sec);
+  }
+  return out;
+}
+
+/* ---------- workout types + machines ---------- */
+function catSummary(c){
+  if (c.kind === 'cardio') return cardioLines(c)[0] || 'פעילות אירובית';
+  return [setsText(c.sets, c.reps), c.weight != null ? fmtNum(c.weight) + ' ק״ג' : null].filter(Boolean).join(', ') || 'בלי פרטים';
+}
+function viewTypes(){
+  const out = [
+    h('header', {class:'vhead'}, h('h1', {text:'אימונים'}), statusEl()),
+    h('p', {class:'lede', text:'סוגי האימונים והמכשירים שלך. המשקל של מכשיר משותף לכל האימונים שבהם הוא מופיע, ושינוי כאן לא משנה אימונים שכבר נשמרו.'})
+  ];
+  const tl = h('div', {class:'tlist'});
+  types().forEach(t => {
+    const items = t.items.map(catById).filter(Boolean), sn = items.filter(c => c.kind !== 'cardio').length;
+    const days = scheduledDays(t.id);
+    tl.append(h('button', {class:'tcard', type:'button', id:'tc-' + t.id, onclick:() => openSub({view:'type', id:t.id})},
+      h('div', {class:'tmain'},
+        h('div', {class:'tname', text:t.name || 'אימון בלי שם'}),
+        h('div', {class:'tsum', text:itemsSummary(sn, items.length - sn) || 'עוד אין תרגילים'}),
+        h('div', {class:'tsum', text:days.length ? 'בלוח הקבוע: ' + days.map(i => WD_NAME[i]).join(', ') : 'לא משובץ בלוח הקבוע'})),
+      h('span', {class:'chev', html:I.left})));
+  });
+  if (!types().length) tl.append(h('p', {class:'note', text:'עוד אין סוגי אימונים.'}));
+  out.push(h('section', {class:'sec'}, h('h2', {text:'סוגי אימונים'}), tl,
+    h('div', {class:'factions'}, h('button', {class:'btn', type:'button', id:'new-type', onclick:newType}, h('span', {html:I.plus}), 'סוג אימון חדש'))));
+  const cl = h('div', {class:'plist'});
+  cat().forEach(c => {
+    const used = types().filter(t => t.items.indexOf(c.id) >= 0).map(t => t.name);
+    cl.append(h('div', {class:'prow', id:'cr-' + c.id},
+      h('div', {class:'pmain'}, nameLine(c.name, c.kind === 'strength' ? c.machine : ''),
+        h('div', {class:'meta', text:catSummary(c)}),
+        h('div', {class:'desc', text:used.length ? 'באימון: ' + used.join(', ') : 'לא משויך לאף אימון'})),
+      h('div', {class:'pact'}, h('button', {class:'btn small', type:'button', id:'ce-' + c.id, onclick:() => openSub({view:'item', id:c.id, kind:c.kind, back:null})}, 'עריכה'))));
+  });
+  if (!cat().length) cl.append(h('p', {class:'note', text:'עוד אין מכשירים.'}));
+  out.push(h('section', {class:'sec'}, h('h2', {text:'מכשירים ופעילויות'}), cl,
+    h('div', {class:'factions'},
+      h('button', {class:'btn', type:'button', id:'new-str', onclick:() => openSub({view:'item', id:'new', kind:'strength', back:null})}, h('span', {html:I.plus}), 'מכשיר חדש'),
+      h('button', {class:'btn', type:'button', id:'new-car', onclick:() => openSub({view:'item', id:'new', kind:'cardio', back:null})}, h('span', {html:I.plus}), 'פעילות אירובית חדשה'))));
+  return out;
+}
+function openSub(sub){
+  S.sub = sub; S.confirm = null; S.draftError = null;
+  if (sub.view === 'item') S.draft = sub.id === 'new' ? blankDraft(sub.kind) : draftFrom(catById(sub.id));
+  render(); window.scrollTo(0, 0);
+}
+function closeSub(){
+  const back = S.sub && S.sub.back;
+  S.sub = back || null; S.draft = null; S.confirm = null; S.draftError = null;
+  render(); window.scrollTo(0, 0);
+}
+function viewSub(){ return S.sub.view === 'type' ? viewTypeEditor(S.sub.id) : viewItemEditor(); }
+function newType(){
+  const app = clone(S.app), id = newId('t');
+  app.types.push({id, name:'אימון חדש', items:[]});
+  savePlan(app);
+  openSub({view:'type', id});
+  setTimeout(() => { const el = D.getElementById('t-name'); if (el) { el.focus(); el.select(); } }, 50);
+}
+function renameType(id, v){
+  const app = clone(S.app), t = app.types.find(x => x.id === id); if (!t) return;
+  t.name = v.trim(); savePlan(app);
+  const h1 = D.querySelector('#view .vhead h1'); if (h1) h1.textContent = t.name || 'אימון בלי שם';
+}
+function moveInType(id, i, dir){
+  const app = clone(S.app), t = app.types.find(x => x.id === id); if (!t) return;
+  const j = i + dir; if (j < 0 || j >= t.items.length) return;
+  const tmp = t.items[i]; t.items[i] = t.items[j]; t.items[j] = tmp;
+  savePlan(app); render();
+}
+function addToType(id, cid){
+  const app = clone(S.app), t = app.types.find(x => x.id === id); if (!t || t.items.indexOf(cid) >= 0) return;
+  t.items.push(cid); savePlan(app); render();
+}
+function removeFromType(id, cid){
+  const app = clone(S.app), t = app.types.find(x => x.id === id); if (!t) return;
+  t.items = t.items.filter(x => x !== cid); savePlan(app); render();
+}
+function deleteType(id){
+  const app = clone(S.app);
+  app.types = app.types.filter(x => x.id !== id);
+  app.schedule.forEach(v => { v.days = v.days.map(d => d.filter(x => x !== id)); });
+  Object.keys(app.overrides).forEach(k => { app.overrides[k] = app.overrides[k].filter(x => x !== id); });
+  savePlan(app);
+  S.sub = null; S.confirm = null; toast('סוג האימון נמחק'); render(); window.scrollTo(0, 0);
+}
+function viewTypeEditor(id){
+  const t = typeById(id);
+  if (!t) { S.sub = null; return viewTypes(); }
+  const out = [
+    h('button', {class:'back', type:'button', id:'back', onclick:() => { S.sub = null; S.confirm = null; render(); window.scrollTo(0, 0); }}, h('span', {html:I.right}), 'חזרה לאימונים'),
+    h('header', {class:'vhead'}, h('h1', {text:t.name || 'אימון בלי שם'}), statusEl()),
+    h('label', {class:'field', for:'t-name'}, h('span', {text:'שם האימון'}),
+      h('input', {id:'t-name', value:t.name, autocomplete:'off', enterkeyhint:'done', maxlength:'60', onkeydown:enterBlur, oninput:e => renameType(id, e.target.value)})),
+    h('h2', {class:'h2', text:'מה כולל האימון'})
+  ];
+  const list = h('div', {class:'plist'});
+  t.items.forEach((cid, i) => {
+    const c = catById(cid); if (!c) return;
+    list.append(h('div', {class:'prow', id:'ti-' + cid},
+      h('div', {class:'pmain'}, nameLine(c.name, c.kind === 'strength' ? c.machine : ''), h('div', {class:'meta', text:catSummary(c)})),
+      h('div', {class:'pact'},
+        h('button', {class:'icon-btn', type:'button', id:'tu-' + cid, 'aria-label':'הזזה למעלה: ' + c.name, disabled:i === 0, html:I.up, onclick:() => moveInType(id, i, -1)}),
+        h('button', {class:'icon-btn', type:'button', id:'td-' + cid, 'aria-label':'הזזה למטה: ' + c.name, disabled:i === t.items.length - 1, html:I.down, onclick:() => moveInType(id, i, 1)}),
+        h('button', {class:'btn small', type:'button', id:'te-' + cid, onclick:() => openSub({view:'item', id:cid, kind:c.kind, back:{view:'type', id}})}, 'עריכה'),
+        h('button', {class:'icon-btn', type:'button', id:'tx-' + cid, 'aria-label':'הוצאה מהאימון: ' + c.name, html:I.x, onclick:() => removeFromType(id, cid)}))));
+  });
+  if (!t.items.length) list.append(h('p', {class:'note', text:'עוד אין תרגילים באימון הזה.'}));
+  out.push(list);
+  const sel = h('select', {id:'t-add', 'aria-label':'הוספה לאימון', onchange:e => {
+    const v = e.target.value; if (!v) return;
+    if (v === '__s') openSub({view:'item', id:'new', kind:'strength', back:{view:'type', id}, addTo:id});
+    else if (v === '__c') openSub({view:'item', id:'new', kind:'cardio', back:{view:'type', id}, addTo:id});
+    else addToType(id, v);
+  }});
+  sel.append(h('option', {value:'', text:'הוספה לאימון…'}));
+  cat().filter(c => t.items.indexOf(c.id) < 0).forEach(c => sel.append(h('option', {value:c.id, text:c.name + (c.kind === 'strength' && c.machine ? ' (מכשיר ' + c.machine + ')' : '')})));
+  sel.append(h('option', {value:'__s', text:'מכשיר חדש…'}), h('option', {value:'__c', text:'פעילות אירובית חדשה…'}));
+  out.push(selectWrap(sel));
+  out.push(S.confirm === 'del-type'
+    ? confirmBox('למחוק את "' + (t.name || 'האימון') + '"? הוא יוסר גם מהלוח הקבוע. אימונים שכבר נשמרו נשארים בהיסטוריה.', 'מחיקה', () => deleteType(id))
+    : h('div', {class:'factions'}, h('button', {class:'btn danger', type:'button', id:'t-del', onclick:() => { S.confirm = 'del-type'; render(); focusSoon('cf-no'); }}, 'מחיקת סוג האימון')));
+  return out;
+}
+function blankDraft(kind){
+  if (kind === 'cardio') return {name:'', mode:'walk', minutes:'', walkSpeed:'', walkIncline:'', runSpeed:'', runIncline:'', runMinutes:'', runEvery:'', cdMinutes:'', cdSpeed:'', cdIncline:'', notes:''};
+  return {name:'', machine:'', group:'', desc:'', sets:'', reps:'', weight:''};
+}
+function draftFrom(c){
+  if (!c) return blankDraft('strength');
+  if (c.kind === 'cardio') {
+    const w = c.walk || {}, r = c.run || {}, cd = c.cooldown || {};
+    return {name:c.name || '', mode:c.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:fmtNum(c.minutes), walkSpeed:fmtNum(w.speed), walkIncline:fmtNum(w.incline),
+      runSpeed:fmtNum(r.speed), runIncline:fmtNum(r.incline), runMinutes:fmtNum(r.minutes), runEvery:fmtNum(r.every),
+      cdMinutes:fmtNum(cd.minutes), cdSpeed:fmtNum(cd.speed), cdIncline:fmtNum(cd.incline), notes:c.notes || ''};
+  }
+  return {name:c.name || '', machine:c.machine || '', group:c.group || '', desc:c.desc || '', sets:fmtNum(c.sets), reps:fmtNum(c.reps), weight:fmtNum(c.weight)};
+}
+function itemFromDraft(kind, d){
+  if (kind === 'cardio') return {kind:'cardio', name:d.name.trim(), mode:d.mode, minutes:nonNeg(d.minutes),
+    walk:{speed:nonNeg(d.walkSpeed), incline:num(d.walkIncline)},
+    run:{speed:nonNeg(d.runSpeed), incline:num(d.runIncline), minutes:nonNeg(d.runMinutes), every:nonNeg(d.runEvery)},
+    cooldown:{minutes:nonNeg(d.cdMinutes), speed:nonNeg(d.cdSpeed), incline:num(d.cdIncline)}, notes:d.notes.trim()};
+  return {kind:'strength', name:d.name.trim(), machine:d.machine.trim(), group:d.group || '', desc:d.desc.trim(), sets:posInt(d.sets), reps:posInt(d.reps), weight:nonNeg(d.weight)};
+}
+function field(label, control){ return h('label', {class:'field', for:control.id || null}, h('span', {text:label}), control); }
+function textInput(id, value, set, extra){ return h('input', Object.assign({id, value:value || '', autocomplete:'off', enterkeyhint:'next', oninput:set}, extra || {})); }
+function viewItemEditor(){
+  const sub = S.sub, d = S.draft, isNew = sub.id === 'new';
+  const c = isNew ? null : catById(sub.id);
+  if (!isNew && !c) { S.sub = sub.back || null; return S.sub ? viewSub() : viewTypes(); }
+  const backType = sub.back ? typeById(sub.back.id) : null;
+  const set = k => e => { d[k] = e.target.value; };
+  const out = [
+    h('button', {class:'back', type:'button', id:'back', onclick:closeSub}, h('span', {html:I.right}), backType ? 'חזרה ל' + (backType.name || 'אימון') : 'חזרה לאימונים'),
+    h('header', {class:'vhead'}, h('h1', {text:isNew ? (sub.kind === 'cardio' ? 'פעילות אירובית חדשה' : 'מכשיר חדש') : 'עריכת ' + c.name}))
+  ];
+  const form = h('form', {class:'pform', id:'itemform', novalidate:true, onsubmit:e => { e.preventDefault(); saveItem(); }});
+  if (sub.kind === 'cardio') {
+    const segBtn = (id, label, val) => h('button', {type:'button', id, 'aria-pressed':d.mode === val ? 'true' : 'false', onclick:() => { d.mode = val; render(); }}, label);
+    [
+      field('שם הפעילות', textInput('c-name', d.name, set('name'), {placeholder:'למשל: הליכון', maxlength:'60'})),
+      h('div', {class:'fieldrow'}, h('span', {class:'flabel', text:'סוג'}),
+        h('div', {class:'seg', role:'group', 'aria-label':'סוג הפעילות'}, segBtn('c-walk', 'הליכה', 'walk'), segBtn('c-walkrun', 'הליכה וריצה', 'walkrun'))),
+      h('fieldset', null, h('legend', {text:'הליכה'}), h('div', {class:'grid2'},
+        field('מהירות (קמ״ש)', textInput('c-ws', d.walkSpeed, set('walkSpeed'), {inputmode:'decimal'})),
+        field('שיפוע', textInput('c-wi', d.walkIncline, set('walkIncline'), {inputmode:'decimal'})))),
+      d.mode === 'walkrun' ? h('fieldset', null, h('legend', {text:'ריצה'}), h('div', {class:'grid2'},
+        field('מהירות (קמ״ש)', textInput('c-rs', d.runSpeed, set('runSpeed'), {inputmode:'decimal'})),
+        field('שיפוע', textInput('c-ri', d.runIncline, set('runIncline'), {inputmode:'decimal'})),
+        field('דקות ריצה בכל פעם', textInput('c-rm', d.runMinutes, set('runMinutes'), {inputmode:'decimal'})),
+        field('כל כמה דקות', textInput('c-re', d.runEvery, set('runEvery'), {inputmode:'decimal'})))) : null,
+      field('משך כולל (דקות)', textInput('c-min', d.minutes, set('minutes'), {inputmode:'decimal'})),
+      h('fieldset', null, h('legend', {text:'התקררות בסוף'}), h('div', {class:'grid3'},
+        field('דקות', textInput('c-cm', d.cdMinutes, set('cdMinutes'), {inputmode:'decimal'})),
+        field('מהירות', textInput('c-cs', d.cdSpeed, set('cdSpeed'), {inputmode:'decimal'})),
+        field('שיפוע', textInput('c-ci', d.cdIncline, set('cdIncline'), {inputmode:'decimal'})))),
+      field('הערות', textInput('c-notes', d.notes, set('notes'), {maxlength:'200'}))
+    ].filter(Boolean).forEach(x => form.append(x));
+  } else {
+    const gs = h('select', {id:'f-group', onchange:e => { d.group = e.target.value; }});
+    gs.append(h('option', {value:'', text:'בלי קבוצה'}));
+    const groups = GROUPS.slice(); if (d.group && groups.indexOf(d.group) < 0) groups.push(d.group);
+    groups.forEach(g => gs.append(h('option', {value:g, text:g, selected:d.group === g})));
+    form.append(
+      field('שם התרגיל', textInput('f-name', d.name, set('name'), {placeholder:'למשל: לחיצת חזה במכשיר', maxlength:'60'})),
+      h('div', {class:'grid2'},
+        field('מספר המכשיר', textInput('f-machine', d.machine, set('machine'), {placeholder:'למשל: 2', maxlength:'10'})),
+        h('div', {class:'field'}, h('span', {text:'קבוצת שרירים'}), selectWrap(gs))),
+      field('תיאור המכשיר', textInput('f-desc', d.desc, set('desc'), {placeholder:'למשל: ריפוד אדום, ליד החלון', maxlength:'120'})),
+      h('div', {class:'grid3'},
+        field('סטים', textInput('f-sets', d.sets, set('sets'), {inputmode:'numeric'})),
+        field('חזרות', textInput('f-reps', d.reps, set('reps'), {inputmode:'numeric'})),
+        field('משקל (ק״ג)', textInput('f-weight', d.weight, set('weight'), {inputmode:'decimal'}))));
+  }
+  const used = isNew ? [] : types().filter(t => t.items.indexOf(c.id) >= 0).map(t => t.name);
+  if (used.length > 1) form.append(h('p', {class:'hint', text:'השינויים יחולו על כל האימונים שבהם הוא מופיע: ' + used.join(', ') + '.'}));
+  if (S.draftError) form.append(h('p', {class:'err', role:'alert', text:S.draftError}));
+  if (S.confirm === 'del-item') {
+    form.append(confirmBox('למחוק את "' + c.name + '"' + (used.length ? ' מכל האימונים (' + used.join(', ') + ')' : '') + '? אימונים שכבר נשמרו לא ישתנו.', 'מחיקה', () => deleteItem(c.id)));
+  } else {
+    form.append(h('div', {class:'factions'},
+      h('button', {class:'btn primary', type:'submit', id:'f-save'}, 'שמירה'),
+      h('button', {class:'btn', type:'button', id:'f-cancel', onclick:closeSub}, 'ביטול'),
+      isNew ? null : h('button', {class:'btn danger', type:'button', id:'f-del', onclick:() => { S.confirm = 'del-item'; render(); focusSoon('cf-no'); }}, 'מחיקה')));
+  }
+  out.push(form);
+  return out;
+}
+function saveItem(){
+  const sub = S.sub, d = S.draft;
+  if (!d.name.trim()) {
+    S.draftError = sub.kind === 'cardio' ? 'צריך לתת לפעילות שם' : 'צריך לתת לתרגיל שם';
+    render(); focusSoon(sub.kind === 'cardio' ? 'c-name' : 'f-name'); return;
+  }
+  const app = clone(S.app), item = itemFromDraft(sub.kind, d);
+  if (sub.id === 'new') {
+    item.id = newId('c'); app.catalog.push(item);
+    if (sub.addTo) { const t = app.types.find(x => x.id === sub.addTo); if (t) t.items.push(item.id); }
+  } else {
+    const i = app.catalog.findIndex(x => x.id === sub.id); if (i < 0) return;
+    item.id = sub.id; app.catalog[i] = item;
+  }
+  savePlan(app);
+  toast(sub.kind === 'cardio' ? 'הפעילות נשמרה' : 'המכשיר נשמר');
+  closeSub();
+}
+function deleteItem(id){
+  const app = clone(S.app);
+  app.catalog = app.catalog.filter(x => x.id !== id);
+  app.types.forEach(t => { t.items = t.items.filter(x => x !== id); });
+  savePlan(app);
+  toast('נמחק');
+  closeSub();
+}
+
+/* ---------- history ---------- */
+function viewHistory(){
+  const out = [h('header', {class:'vhead'}, h('h1', {text:'היסטוריה'}), statusEl()), backupReminder('remind-hist')];
+  const keys = Object.keys(S.workouts).filter(isKey).sort().reverse();
+  if (!keys.length) out.push(emptyCard('עוד אין אימונים שמורים', 'אימון נשמר מהרגע שמסמנים בו את התרגיל הראשון, יחד עם היום והתאריך שלו.'));
+  let month = null, ml = null;
+  keys.forEach(k => {
+    const m = k.slice(0, 7);
+    if (m !== month) {
+      month = m;
+      const n = keys.filter(x => x.slice(0, 7) === m).length;
+      out.push(h('h2', {class:'month'}, h('span', {text:fMonth.format(keyDate(m + '-01'))}), h('span', {class:'mcount', text:n === 1 ? 'אימון אחד' : n + ' אימונים'})));
+      ml = h('div', {class:'hlist'}); out.push(ml);
+    }
+    ml.append(historyItem(k));
+  });
+  out.push(dataSection());
+  return out;
+}
+function historyItem(k){
+  const w = S.workouts[k], items = [];
+  w.sessions.forEach(s => (s.items || []).forEach(i => items.push(i)));
+  const d = items.filter(i => i.done).length, n = items.length;
+  const dots = h('div', {class:'dots', 'aria-hidden':'true'});
+  items.forEach(i => dots.append(h('i', {class:i.done ? 'on' : null})));
+  const cardio = items.filter(i => i.kind === 'cardio').map(i => { const r = resultText(i.result); return i.name + (i.done ? ' בוצע' : ' לא בוצע') + (r ? ': ' + r : ''); });
+  const names = w.sessions.map(s => s.name).filter(Boolean).join(', ');
+  return h('button', {class:'hitem', type:'button', id:'h-' + k, onclick:() => { S.tab = 'week'; selectDay(k); }},
+    h('div', {class:'hmain'},
+      h('div', {class:'hdate'}, h('span', {class:'hday', text:fDay.format(keyDate(k))}), h('span', {class:'hd', text:fDM.format(keyDate(k))})),
+      h('div', {class:'hsum', text:(names ? names + ', ' : '') + (n ? d + ' מתוך ' + n + ' בוצעו' : 'בלי תרגילים')}),
+      n ? dots : null,
+      cardio.length ? h('div', {class:'hsum', text:cardio.join('. ')}) : null,
+      w.note ? h('div', {class:'hnote', text:excerpt(w.note, 90)}) : null),
+    h('span', {class:'chev', html:I.left}));
+}
+function modeText(){
+  if (!S.storageOK) return 'הדפדפן הזה לא מאפשר לשמור נתונים, ולכן הם יימחקו כשהדף ייסגר. כדאי לשמור גיבוי לקובץ בסוף כל אימון.';
+  return 'הנתונים נשמרים במכשיר הזה בלבד, בלי חשבון ובלי שרת. כדי לא לאבד אותם אם המכשיר יוחלף או יאופס, שומרים מדי פעם גיבוי לקובץ בתיקייה שמסתנכרנת למחשב, כמו OneDrive או iCloud Drive. את הקובץ אפשר לשחזר בכל מכשיר.';
+}
+function dataSection(){
+  const sec = h('section', {class:'sec', id:'data'}, h('h2', {text:'גיבוי ושחזור'}),
+    h('p', {class:'note', text:modeText()}),
+    h('p', {class:'note', text:lastBackupText()}));
+  if (isIOS() && !isStandalone()) sec.append(h('p', {class:'warn', text:'האפליקציה פתוחה עכשיו בספארי. באייפון, נתונים שנשמרים בספארי לא מופיעים באפליקציה שבמסך הבית. כדי להעביר אותם, שומרים כאן גיבוי לקובץ ומשחזרים אותו באפליקציה שבמסך הבית.'}));
+  sec.append(h('div', {class:'factions'},
+    h('button', {class:'btn primary', type:'button', id:'bk-file', onclick:saveBackupFile}, 'שמירת גיבוי לקובץ'),
+    h('button', {class:'btn', type:'button', id:'bk-copy', onclick:copyBackup}, 'העתקת גיבוי'),
+    h('button', {class:'btn', type:'button', id:'bk-restore', 'aria-expanded':S.restoreOpen ? 'true' : 'false', onclick:toggleRestore}, 'שחזור מגיבוי')));
+  if (S.backupText) {
+    const ta = h('textarea', {id:'bk-text', rows:'4', readonly:true, 'aria-label':'טקסט הגיבוי'}); ta.value = S.backupText;
+    sec.append(h('p', {class:'hint', text:'ההעתקה האוטומטית לא עבדה כאן. מסמנים את הטקסט ומעתיקים ידנית.'}), ta);
+  }
+  if (S.restoreOpen) sec.append(restorePanel());
+  return sec;
+}
+function toggleRestore(){
+  S.restoreOpen = !S.restoreOpen; S.restorePending = null; S.restoreError = null;
+  render();
+}
+function restorePanel(){
+  const wrap = h('div', {class:'rpanel'});
+  wrap.append(
+    h('input', {type:'file', id:'rs-file', hidden:true, onchange:onRestoreFile}),
+    h('div', {class:'factions'}, h('button', {class:'btn primary', type:'button', id:'rs-pick', onclick:() => { const f = D.getElementById('rs-file'); if (f) f.click(); }}, 'בחירת קובץ גיבוי')));
+  const ta = h('textarea', {id:'rs-text', rows:'3', placeholder:'או מדביקים כאן את טקסט הגיבוי', oninput:e => { S.restoreText = e.target.value; }});
+  ta.value = S.restoreText;
+  wrap.append(h('label', {class:'nlabel', for:'rs-text', text:'הדבקת טקסט גיבוי'}), ta);
+  if (S.restoreError) wrap.append(h('p', {class:'err', role:'alert', text:S.restoreError}));
+  if (S.restorePending) {
+    const p = S.restorePending;
+    const sn = p.plan.catalog.filter(c => c.kind !== 'cardio').length, cn = p.plan.catalog.length - sn;
+    const tn = p.plan.types.length, wn = p.workouts.length;
+    const tTxt = tn === 1 ? 'סוג אימון אחד' : tn + ' סוגי אימונים';
+    const wTxt = wn === 0 ? 'בלי אימונים שמורים' : wn === 1 ? 'אימון שמור אחד' : wn + ' אימונים שמורים';
+    const text = S.app
+      ? (wn ? 'השחזור יחליף את המכשירים, סוגי האימונים והלוח הקבוע, ויוסיף ' + wTxt + ' מהגיבוי לפי תאריך. אימונים שלא מופיעים בגיבוי יישארו.'
+            : 'השחזור יחליף את המכשירים, סוגי האימונים והלוח הקבוע. אימונים שכבר שמורים במכשיר יישארו.')
+      : 'בגיבוי ' + [itemsSummary(sn, cn) || 'אין מכשירים', tTxt, wTxt].join(', ') + '. לטעון אותו?';
+    wrap.append(confirmBox(text, 'שחזור', doRestore));
+  } else wrap.append(h('div', {class:'factions'}, h('button', {class:'btn', type:'button', id:'rs-go', onclick:checkRestore}, 'שחזור מהטקסט')));
+  return wrap;
+}
+function onRestoreFile(e){
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  if (f.size > 25e6) { S.restoreError = 'הקובץ גדול מדי בשביל גיבוי של האפליקציה.'; render(); return; }
+  const r = new FileReader();
+  r.onload = () => { S.restoreText = String(r.result || ''); checkRestore(); };
+  r.onerror = () => { S.restoreError = 'הקובץ לא נקרא. אפשר לבחור אותו שוב, או להדביק את טקסט הגיבוי.'; render(); };
+  r.readAsText(f);
+}
+function checkRestore(){
+  let o = null;
+  try { o = JSON.parse(S.restoreText); } catch (e) {}
+  const raw = o && (o.plan || (Array.isArray(o.catalog) && Array.isArray(o.types) ? o : null));
+  const plan = raw && Array.isArray(raw.catalog) && Array.isArray(raw.types) ? normApp(raw) : null;
+  if (!plan) { S.restoreError = 'זה לא גיבוי של האפליקציה. בוחרים קובץ שנשמר מהאפליקציה, או מדביקים את הטקסט שלו.'; S.restorePending = null; render(); return; }
+  const workouts = o.plan && Array.isArray(o.workouts) ? o.workouts.map(normRec).filter(Boolean) : [];
+  S.restoreError = null; S.restorePending = {plan, workouts}; render(); focusSoon('cf-no');
+}
+function doRestore(){
+  const p = S.restorePending; if (!p) return;
+  const fresh = !S.app;
+  p.plan.updatedAt = nowISO(); commitApp(p.plan);
+  p.workouts.forEach(w => commitRecord(w));
+  S.meta.lastBackupAt = nowISO(); saveMeta();
+  S.restoreOpen = false; S.restoreText = ''; S.restorePending = null; S.restoreError = null; S.confirm = null;
+  if (fresh) { S.tab = scheduleEmpty() ? 'schedule' : 'week'; S.sel = todayKey(); }
+  render(); window.scrollTo(0, 0);
+  toast(fresh && scheduleEmpty() ? 'הגיבוי נטען. עכשיו בוחרים באילו ימים מתאמנים' : 'השחזור הושלם');
+}
+function backupText(){
+  const ws = Object.keys(S.workouts).sort().map(k => S.workouts[k]);
+  return JSON.stringify({app:'my-fitness-app', format:2, exportedAt:nowISO(), plan:S.app, workouts:ws}, null, 1);
+}
+function markBackedUp(){ S.meta.lastBackupAt = nowISO(); saveMeta(); render(); }
+async function saveBackupFile(){
+  const text = backupText(), name = 'my-fitness-app-backup-' + todayKey() + '.json';
+  if (isMobileOS() && navigator.share && navigator.canShare) {
+    let file = null;
+    for (const type of ['application/json', 'text/plain']) {
+      try { const f = new File([text], name, {type}); if (navigator.canShare({files:[f]})) { file = f; break; } } catch (e) {}
+    }
+    if (file) {
+      try { await navigator.share({files:[file]}); markBackedUp(); toast('הגיבוי נשמר'); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+  }
+  try {
+    const url = URL.createObjectURL(new Blob([text], {type:'application/json'}));
+    const a = h('a', {href:url, download:name, hidden:true});
+    D.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+    markBackedUp(); toast('קובץ הגיבוי ' + name + ' הורד');
+  } catch (e) { copyBackup(); }
+}
+async function copyBackup(){
+  const text = backupText();
+  try { await navigator.clipboard.writeText(text); S.backupText = ''; markBackedUp(); toast('הגיבוי הועתק. כדאי להדביק אותו בפתק או במייל לעצמך.'); }
+  catch (e) { S.backupText = text; render(); const ta = D.getElementById('bk-text'); if (ta) { ta.focus(); ta.select(); } }
+}
+
+/* ---------- offline support + updates ---------- */
+let waitingSW = null, wantReload = false;
+function applyUpdate(){
+  if (!waitingSW) { location.reload(); return; }
+  wantReload = true;
+  try { waitingSW.postMessage('skip-waiting'); } catch (e) { location.reload(); }
+}
+function registerSW(){
+  if (!('serviceWorker' in navigator)) return;
+  const secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!secure) return;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (wantReload) { wantReload = false; location.reload(); } });
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    const offer = w => { if (!w || !navigator.serviceWorker.controller) return; waitingSW = w; if (!S.updateReady) { S.updateReady = true; render(); } };
+    if (reg.waiting) offer(reg.waiting);
+    reg.addEventListener('updatefound', () => {
+      const w = reg.installing; if (!w) return;
+      w.addEventListener('statechange', () => { if (w.state === 'installed') offer(w); });
+    });
+    D.addEventListener('visibilitychange', () => { if (D.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(() => {});
+}
+
+/* ---------- wiring ---------- */
+D.getElementById('tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  const t = b.dataset.tab;
+  if (t === 'week' && S.tab === 'week' && S.sel !== todayKey()) { selectDay(todayKey()); return; }
+  setTab(t);
+});
+(function swipe(){
+  const view = D.getElementById('view'); let s = null;
+  view.addEventListener('touchstart', e => {
+    s = null;
+    if (S.tab !== 'week' || !S.app || e.touches.length !== 1) return;
+    const t = e.target;
+    if (!t.closest || t.closest('input,textarea,select,.days7')) return;
+    const zone = t.closest('#daypanel') ? 1 : (t.closest('.wk') ? 7 : 0);
+    if (!zone) return;
+    s = {x:e.touches[0].clientX, y:e.touches[0].clientY, at:Date.now(), zone};
+  }, {passive:true});
+  view.addEventListener('touchend', e => {
+    if (!s) return;
+    const p = e.changedTouches[0], dx = p.clientX - s.x, dy = p.clientY - s.y, zone = s.zone, dt = Date.now() - s.at;
+    s = null;
+    if (dt > 800 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+    selectDay(addDays(S.sel, dx > 0 ? zone : -zone));
+  }, {passive:true});
+})();
+function checkDay(){
+  const t = todayKey();
+  if (t !== S.lastToday) { if (S.sel === S.lastToday) S.sel = t; S.lastToday = t; render(); }
+}
+D.addEventListener('visibilitychange', () => { if (D.visibilityState === 'visible') checkDay(); });
+window.addEventListener('focus', checkDay);
+window.addEventListener('storage', e => { if (!e.key || e.key.indexOf(P) === 0) { loadAll(); render(); } });
+setInterval(checkDay, 60000);
+
+loadAll();
+render();
+registerSW();
+})();
+</script>
+</body>
+</html>

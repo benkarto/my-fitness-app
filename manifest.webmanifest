@@ -1,0 +1,38 @@
+{
+  "id": "./",
+  "name": "My Fitness App",
+  "short_name": "My Fitness App",
+  "description": "צ׳קליסט אימונים לפי לוח שבועי, עם משקלים, הליכון והיסטוריה. הנתונים נשמרים במכשיר.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EDE9E3",
+  "theme_color": "#141719",
+  "categories": [
+    "health",
+    "fitness"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
