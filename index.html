@@ -287,6 +287,8 @@ legend{font-size:.9rem;font-weight:800;padding:0 6px}
 .tab[aria-current="page"]{color:var(--ink);font-weight:700}
 .tab[aria-current="page"] svg{color:var(--mark)}
 
+/* While the on-screen keyboard is open the tab bar is hidden; iOS otherwise leaves it floating mid-screen. */
+.kb .tabs{display:none}
 .toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:14px;font-size:.92rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30;width:max-content;max-width:calc(100% - 32px);text-align:center}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
@@ -749,6 +751,7 @@ function render(){
     }
   }
   if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
+  kbSync();
 }
 function setTab(t){
   S.tab = t; S.sub = null; S.draft = null; S.confirm = null; S.dayEdit = null; S.moveTarget = null;
@@ -1650,6 +1653,19 @@ function registerSW(){
 }
 
 /* ---------- wiring ---------- */
+/* iOS home-screen apps: when the keyboard closes because the focused field was removed (a re-render),
+   the page can stay shifted and the fixed tab bar floats mid-screen. kbSync() keeps a 'kb' class while
+   a field is focused (the bar is hidden then) and nudges the scroll so the layout settles afterwards. */
+const isField = el => !!el && !!el.matches && el.matches('input:not([type=file]),textarea,select');
+function kbSettle(){ const y = window.scrollY; window.scrollTo(0, y > 0 ? y - 1 : y + 1); window.scrollTo(0, y); }
+function kbSync(){
+  const root = D.documentElement, on = isField(D.activeElement), was = root.classList.contains('kb');
+  root.classList.toggle('kb', on);
+  if (was && !on) { kbSettle(); setTimeout(kbSettle, 350); }
+}
+D.addEventListener('focusin', kbSync);
+D.addEventListener('focusout', () => setTimeout(kbSync, 80));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', () => setTimeout(kbSync, 80));
 D.getElementById('tabs').addEventListener('click', e => {
   const b = e.target.closest('.tab'); if (!b) return;
   const t = b.dataset.tab;
