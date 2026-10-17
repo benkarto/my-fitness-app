@@ -145,6 +145,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px soli
 .name{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:1.05rem;font-weight:700;line-height:1.3}
 .row.done.live .nm{text-decoration:line-through;text-decoration-thickness:2px;opacity:.6}
 .num{display:inline-block;background:var(--mark);color:var(--on-mark);font-size:.75rem;font-weight:700;line-height:1.55;border-radius:5px;padding:0 7px}
+.num.body{background:transparent;color:var(--dim);box-shadow:inset 0 0 0 1px var(--line)}
 .meta{font-size:.9rem;color:var(--dim)}
 .desc{font-size:.84rem;color:var(--dim)}
 .skip{font-size:.8rem;color:var(--dim);font-weight:700}
@@ -328,7 +329,9 @@ legend{font-size:.9rem;font-weight:800;padding:0 6px}
  *
  * PlanDoc   = {schema:2, catalog:[Item], types:[Type], schedule:[Version],
  *              overrides:{date:[typeId]}, createdAt, updatedAt}
- * Item      = strength {id, kind:'strength', name, machine, group, desc, sets, reps, weight}
+ * Item      = strength {id, kind:'strength', name, machine, group, desc, sets, reps, weight,
+ *                       equip:'machine'|'body', unit:'reps'|'sec', perSide}
+ *             (equip, unit and perSide are optional; missing means machine, reps, false)
  *           | cardio   {id, kind:'cardio', name, mode:'walk'|'walkrun', minutes,
  *                       walk:{speed,incline}, run:{speed,incline,minutes,every},
  *                       cooldown:{minutes,speed,incline}, notes}
@@ -340,7 +343,7 @@ legend{font-size:.9rem;font-weight:800;padding:0 6px}
  * overrides = one-time changes: the exact list of type ids for that date.
  * DayRecord = {schema:2, date, createdAt, updatedAt, note,
  *              sessions:[{typeId, name, items:[RecItem]}]}
- * RecItem   = strength {id, kind, name, machine, group, sets, reps, weight, done}
+ * RecItem   = strength {id, kind, name, machine, group, sets, reps, weight, equip, unit, perSide, done}
  *           | cardio   {id, kind, name, mode, minutes, walk, run, cooldown, notes,
  *                       done, result:{min,sec,km,hr,kcal}}
  * Today's record follows the plan live (rebuilt on every write); records of
@@ -349,7 +352,10 @@ legend{font-size:.9rem;font-weight:800;padding:0 6px}
 
 const D = document;
 const P = 'mfa:';
-const GROUPS = ['חזה','גב','כתפיים','רגליים','ידיים','בטן','אחר'];
+const GROUPS = ['חימום','חזה','גב','כתפיים','רגליים','ידיים','בטן','גו','אחר'];
+const CARDIO_GROUP = 'אירובי';
+const isBody = c => !!c && c.equip === 'body';
+const strengthExtra = c => ({equip:isBody(c) ? 'body' : 'machine', unit:c && c.unit === 'sec' ? 'sec' : 'reps', perSide:!!(c && c.perSide)});
 const WD_LETTER = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
 const WD_NAME = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const fDay = new Intl.DateTimeFormat('he-IL', {weekday:'long'});
@@ -418,15 +424,16 @@ const posInt = v => { const n = num(v); return n == null || n <= 0 ? null : Math
 const nonNeg = v => { const n = num(v); return n == null || n < 0 ? null : round2(n); };
 const excerpt = (s, n) => s.length > n ? s.slice(0, n).trim() + '…' : s;
 function minutesPhrase(m){ const n = num(m); return n === 1 ? 'דקה' : n === 2 ? 'שתי דקות' : fmtNum(n) + ' דקות'; }
-function setsText(sets, reps){
+function setsText(sets, reps, unit, perSide){
   const s = num(sets), r = num(reps);
   let a = s ? (s === 1 ? 'סט אחד' : s + ' סטים') : '';
-  if (r) a += (a ? ' של ' : '') + (r === 1 ? 'חזרה אחת' : r + ' חזרות');
+  if (r) a += (a ? ' של ' : '') + (unit === 'sec' ? (r === 1 ? 'שנייה אחת' : r + ' שניות') : (r === 1 ? 'חזרה אחת' : r + ' חזרות'));
+  if (a && perSide) a += ' לכל צד';
   return a;
 }
 function itemsSummary(sn, cn){
   const a = [];
-  if (sn) a.push(sn === 1 ? 'מכשיר אחד' : sn + ' מכשירים');
+  if (sn) a.push(sn === 1 ? 'תרגיל אחד' : sn + ' תרגילים');
   if (cn) a.push(cn === 1 ? 'פעילות אירובית' : cn + ' פעילויות אירוביות');
   return a.join(' ו');
 }
@@ -603,7 +610,7 @@ function movePermanent(src, tgt){
 /* ---------- day records ---------- */
 function recItemFrom(c){
   if (c.kind === 'cardio') return {id:c.id, kind:'cardio', name:c.name, mode:c.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:num(c.minutes), walk:clone(c.walk || {}), run:clone(c.run || {}), cooldown:clone(c.cooldown || {}), notes:c.notes || '', done:false, result:emptyResult()};
-  return {id:c.id, kind:'strength', name:c.name, machine:c.machine || '', group:c.group || '', sets:num(c.sets), reps:num(c.reps), weight:num(c.weight), done:false};
+  return Object.assign({id:c.id, kind:'strength', name:c.name, machine:isBody(c) ? '' : (c.machine || ''), group:c.group || '', sets:num(c.sets), reps:num(c.reps), weight:isBody(c) ? null : num(c.weight)}, strengthExtra(c), {done:false});
 }
 function frozenSession(tid){
   const t = typeById(tid); if (!t) return null;
@@ -623,7 +630,8 @@ function liveItems(t, rs){
       items.push({id:cid, kind:'cardio', name:src.name || c.name, mode:src.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:num(src.minutes), walk:clone(src.walk || {}), run:clone(src.run || {}), cooldown:clone(src.cooldown || {}), notes:src.notes || '', done:!!(p && p.done), result:Object.assign(emptyResult(), (p && p.result) || {})});
     } else {
       const done = !!(p && p.done);
-      items.push({id:cid, kind:'strength', name:c.name, machine:c.machine || '', group:c.group || '', sets:num(c.sets), reps:num(c.reps), weight:done ? (p.weight != null ? p.weight : num(c.weight)) : num(c.weight), done});
+      const w = isBody(c) ? null : done ? (p.weight != null ? p.weight : num(c.weight)) : num(c.weight);
+      items.push(Object.assign({id:cid, kind:'strength', name:c.name, machine:isBody(c) ? '' : (c.machine || ''), group:c.group || '', sets:num(c.sets), reps:num(c.reps), weight:w}, strengthExtra(c), {done}));
     }
   });
   prev.forEach(p => { if (p.done || (p.kind === 'cardio' && hasResult(p.result))) items.push(clone(p)); });
@@ -1042,10 +1050,9 @@ function sessionBlock(s, mode, k){
   const list = h('div', {class:'list'});
   let lg = null;
   s.items.forEach(it => {
-    if (it.kind === 'cardio') { lg = null; list.append(cardioRow(it, s.typeId, mode, k)); return; }
-    const g = it.group || '';
+    const g = it.kind === 'cardio' ? CARDIO_GROUP : (it.group || '');
     if (g !== lg) { if (g) list.append(h('div', {class:'group', text:g})); lg = g; }
-    list.append(strengthRow(it, s.typeId, mode, k));
+    list.append(it.kind === 'cardio' ? cardioRow(it, s.typeId, mode, k) : strengthRow(it, s.typeId, mode, k));
   });
   if (!s.items.length) list.append(h('p', {class:'note', text:'אין עדיין תרגילים באימון הזה. מוסיפים אותם בלשונית אימונים.'}));
   return h('section', {class:'sess', 'aria-label':s.name}, head, list);
@@ -1059,9 +1066,10 @@ function tickBtn(key, done, name, onClick){
     'aria-label':(done ? 'ביטול סימון: ' : 'סימון: ') + name, html:I.check, onclick:onClick});
 }
 function stateMark(done){ return h('span', {class:'state ' + (done ? 'yes' : 'no'), role:'img', 'aria-label':done ? 'בוצע' : 'לא בוצע', html:done ? I.check : I.dash}); }
-function nameLine(name, machine){
+function nameLine(name, machine, body){
   const el = h('div', {class:'name'}, h('span', {class:'nm', text:name}));
-  if (machine) el.append(h('span', {class:'num', text:'מכשיר ' + machine}));
+  if (body) el.append(h('span', {class:'num body', text:'ללא מכשיר'}));
+  else if (machine) el.append(h('span', {class:'num', text:'מכשיר ' + machine}));
   return el;
 }
 function strengthRow(it, tid, mode, k){
@@ -1069,11 +1077,13 @@ function strengthRow(it, tid, mode, k){
   const row = h('div', {class:rowClass(it, mode), id:'row-' + key});
   if (interactive) row.append(tickBtn(key, it.done, it.name, () => toggleItem(mode, k, tid, it.id)));
   else if (mode === 'view') row.append(stateMark(it.done));
-  const body = h('div', {class:'body'}, nameLine(it.name, it.machine));
-  const st = setsText(it.sets, it.reps);
+  const bw = isBody(it);
+  const body = h('div', {class:'body'}, nameLine(it.name, it.machine, bw));
+  const st = setsText(it.sets, it.reps, it.unit, it.perSide);
   if (st) body.append(h('div', {class:'meta', text:st}));
   if (mode === 'live') { const c = catById(it.id); if (c && c.desc) body.append(h('div', {class:'desc', text:c.desc})); }
-  if (interactive) body.append(weightStepper(key, it, (v, rr) => setWeight(mode, k, tid, it.id, v, rr)));
+  if (bw) { /* bodyweight: no weight to track */ }
+  else if (interactive) body.append(weightStepper(key, it, (v, rr) => setWeight(mode, k, tid, it.id, v, rr)));
   else body.append(h('div', {class:'meta', text:it.weight != null ? 'משקל ' + fmtNum(it.weight) + ' ק״ג' : 'בלי משקל'}));
   if (mode === 'view' && !it.done) body.append(h('div', {class:'skip', text:'לא בוצע'}));
   row.append(body);
@@ -1224,12 +1234,12 @@ function viewSchedule(){
 /* ---------- workout types + machines ---------- */
 function catSummary(c){
   if (c.kind === 'cardio') return cardioLines(c)[0] || 'פעילות אירובית';
-  return [setsText(c.sets, c.reps), c.weight != null ? fmtNum(c.weight) + ' ק״ג' : null].filter(Boolean).join(', ') || 'בלי פרטים';
+  return [c.group || null, setsText(c.sets, c.reps, c.unit, c.perSide), !isBody(c) && c.weight != null ? fmtNum(c.weight) + ' ק״ג' : null].filter(Boolean).join(', ') || 'בלי פרטים';
 }
 function viewTypes(){
   const out = [
     h('header', {class:'vhead'}, h('h1', {text:'אימונים'}), statusEl()),
-    h('p', {class:'lede', text:'סוגי האימונים והמכשירים שלך. המשקל של מכשיר משותף לכל האימונים שבהם הוא מופיע, ושינוי כאן לא משנה אימונים שכבר נשמרו.'})
+    h('p', {class:'lede', text:'סוגי האימונים והתרגילים שלך. המשקל של מכשיר משותף לכל האימונים שבהם הוא מופיע, ושינוי כאן לא משנה אימונים שכבר נשמרו.'})
   ];
   const tl = h('div', {class:'tlist'});
   types().forEach(t => {
@@ -1249,15 +1259,15 @@ function viewTypes(){
   cat().forEach(c => {
     const used = types().filter(t => t.items.indexOf(c.id) >= 0).map(t => t.name);
     cl.append(h('div', {class:'prow', id:'cr-' + c.id},
-      h('div', {class:'pmain'}, nameLine(c.name, c.kind === 'strength' ? c.machine : ''),
+      h('div', {class:'pmain'}, nameLine(c.name, c.kind === 'strength' ? c.machine : '', isBody(c)),
         h('div', {class:'meta', text:catSummary(c)}),
         h('div', {class:'desc', text:used.length ? 'באימון: ' + used.join(', ') : 'לא משויך לאף אימון'})),
       h('div', {class:'pact'}, h('button', {class:'btn small', type:'button', id:'ce-' + c.id, onclick:() => openSub({view:'item', id:c.id, kind:c.kind, back:null})}, 'עריכה'))));
   });
-  if (!cat().length) cl.append(h('p', {class:'note', text:'עוד אין מכשירים.'}));
-  out.push(h('section', {class:'sec'}, h('h2', {text:'מכשירים ופעילויות'}), cl,
+  if (!cat().length) cl.append(h('p', {class:'note', text:'עוד אין תרגילים.'}));
+  out.push(h('section', {class:'sec'}, h('h2', {text:'תרגילים ופעילויות'}), cl,
     h('div', {class:'factions'},
-      h('button', {class:'btn', type:'button', id:'new-str', onclick:() => openSub({view:'item', id:'new', kind:'strength', back:null})}, h('span', {html:I.plus}), 'מכשיר חדש'),
+      h('button', {class:'btn', type:'button', id:'new-str', onclick:() => openSub({view:'item', id:'new', kind:'strength', back:null})}, h('span', {html:I.plus}), 'תרגיל חדש'),
       h('button', {class:'btn', type:'button', id:'new-car', onclick:() => openSub({view:'item', id:'new', kind:'cardio', back:null})}, h('span', {html:I.plus}), 'פעילות אירובית חדשה'))));
   return out;
 }
@@ -1320,7 +1330,7 @@ function viewTypeEditor(id){
   t.items.forEach((cid, i) => {
     const c = catById(cid); if (!c) return;
     list.append(h('div', {class:'prow', id:'ti-' + cid},
-      h('div', {class:'pmain'}, nameLine(c.name, c.kind === 'strength' ? c.machine : ''), h('div', {class:'meta', text:catSummary(c)})),
+      h('div', {class:'pmain'}, nameLine(c.name, c.kind === 'strength' ? c.machine : '', isBody(c)), h('div', {class:'meta', text:catSummary(c)})),
       h('div', {class:'pact'},
         h('button', {class:'icon-btn', type:'button', id:'tu-' + cid, 'aria-label':'הזזה למעלה: ' + c.name, disabled:i === 0, html:I.up, onclick:() => moveInType(id, i, -1)}),
         h('button', {class:'icon-btn', type:'button', id:'td-' + cid, 'aria-label':'הזזה למטה: ' + c.name, disabled:i === t.items.length - 1, html:I.down, onclick:() => moveInType(id, i, 1)}),
@@ -1336,8 +1346,8 @@ function viewTypeEditor(id){
     else addToType(id, v);
   }});
   sel.append(h('option', {value:'', text:'הוספה לאימון…'}));
-  cat().filter(c => t.items.indexOf(c.id) < 0).forEach(c => sel.append(h('option', {value:c.id, text:c.name + (c.kind === 'strength' && c.machine ? ' (מכשיר ' + c.machine + ')' : '')})));
-  sel.append(h('option', {value:'__s', text:'מכשיר חדש…'}), h('option', {value:'__c', text:'פעילות אירובית חדשה…'}));
+  cat().filter(c => t.items.indexOf(c.id) < 0).forEach(c => sel.append(h('option', {value:c.id, text:c.name + (isBody(c) ? ' (ללא מכשיר)' : c.kind === 'strength' && c.machine ? ' (מכשיר ' + c.machine + ')' : '')})));
+  sel.append(h('option', {value:'__s', text:'תרגיל חדש…'}), h('option', {value:'__c', text:'פעילות אירובית חדשה…'}));
   out.push(selectWrap(sel));
   out.push(S.confirm === 'del-type'
     ? confirmBox('למחוק את "' + (t.name || 'האימון') + '"? הוא יוסר גם מהלוח הקבוע. אימונים שכבר נשמרו נשארים בהיסטוריה.', 'מחיקה', () => deleteType(id))
@@ -1346,7 +1356,7 @@ function viewTypeEditor(id){
 }
 function blankDraft(kind){
   if (kind === 'cardio') return {name:'', mode:'walk', minutes:'', walkSpeed:'', walkIncline:'', runSpeed:'', runIncline:'', runMinutes:'', runEvery:'', cdMinutes:'', cdSpeed:'', cdIncline:'', notes:''};
-  return {name:'', machine:'', group:'', desc:'', sets:'', reps:'', weight:''};
+  return {name:'', equip:'machine', machine:'', group:'', desc:'', sets:'', reps:'', unit:'reps', perSide:false, weight:''};
 }
 function draftFrom(c){
   if (!c) return blankDraft('strength');
@@ -1356,14 +1366,17 @@ function draftFrom(c){
       runSpeed:fmtNum(r.speed), runIncline:fmtNum(r.incline), runMinutes:fmtNum(r.minutes), runEvery:fmtNum(r.every),
       cdMinutes:fmtNum(cd.minutes), cdSpeed:fmtNum(cd.speed), cdIncline:fmtNum(cd.incline), notes:c.notes || ''};
   }
-  return {name:c.name || '', machine:c.machine || '', group:c.group || '', desc:c.desc || '', sets:fmtNum(c.sets), reps:fmtNum(c.reps), weight:fmtNum(c.weight)};
+  const x = strengthExtra(c);
+  return {name:c.name || '', equip:x.equip, machine:c.machine || '', group:c.group || '', desc:c.desc || '', sets:fmtNum(c.sets), reps:fmtNum(c.reps), unit:x.unit, perSide:x.perSide, weight:fmtNum(c.weight)};
 }
 function itemFromDraft(kind, d){
   if (kind === 'cardio') return {kind:'cardio', name:d.name.trim(), mode:d.mode, minutes:nonNeg(d.minutes),
     walk:{speed:nonNeg(d.walkSpeed), incline:num(d.walkIncline)},
     run:{speed:nonNeg(d.runSpeed), incline:num(d.runIncline), minutes:nonNeg(d.runMinutes), every:nonNeg(d.runEvery)},
     cooldown:{minutes:nonNeg(d.cdMinutes), speed:nonNeg(d.cdSpeed), incline:num(d.cdIncline)}, notes:d.notes.trim()};
-  return {kind:'strength', name:d.name.trim(), machine:d.machine.trim(), group:d.group || '', desc:d.desc.trim(), sets:posInt(d.sets), reps:posInt(d.reps), weight:nonNeg(d.weight)};
+  const bw = d.equip === 'body';
+  return {kind:'strength', name:d.name.trim(), equip:bw ? 'body' : 'machine', machine:bw ? '' : d.machine.trim(), group:d.group || '', desc:d.desc.trim(),
+    sets:posInt(d.sets), reps:posInt(d.reps), unit:d.unit === 'sec' ? 'sec' : 'reps', perSide:!!d.perSide, weight:bw ? null : nonNeg(d.weight)};
 }
 function field(label, control){ return h('label', {class:'field', for:control.id || null}, h('span', {text:label}), control); }
 function textInput(id, value, set, extra){ return h('input', Object.assign({id, value:value || '', autocomplete:'off', enterkeyhint:'next', oninput:set}, extra || {})); }
@@ -1375,7 +1388,7 @@ function viewItemEditor(){
   const set = k => e => { d[k] = e.target.value; };
   const out = [
     h('button', {class:'back', type:'button', id:'back', onclick:closeSub}, h('span', {html:I.right}), backType ? 'חזרה ל' + (backType.name || 'אימון') : 'חזרה לאימונים'),
-    h('header', {class:'vhead'}, h('h1', {text:isNew ? (sub.kind === 'cardio' ? 'פעילות אירובית חדשה' : 'מכשיר חדש') : 'עריכת ' + c.name}))
+    h('header', {class:'vhead'}, h('h1', {text:isNew ? (sub.kind === 'cardio' ? 'פעילות אירובית חדשה' : 'תרגיל חדש') : 'עריכת ' + c.name}))
   ];
   const form = h('form', {class:'pform', id:'itemform', novalidate:true, onsubmit:e => { e.preventDefault(); saveItem(); }});
   if (sub.kind === 'cardio') {
@@ -1404,16 +1417,29 @@ function viewItemEditor(){
     gs.append(h('option', {value:'', text:'בלי קבוצה'}));
     const groups = GROUPS.slice(); if (d.group && groups.indexOf(d.group) < 0) groups.push(d.group);
     groups.forEach(g => gs.append(h('option', {value:g, text:g, selected:d.group === g})));
+    const bw = d.equip === 'body', secs = d.unit === 'sec';
+    const seg = (label, aria, opts) => h('div', {class:'fieldrow'}, h('span', {class:'flabel', text:label}),
+      h('div', {class:'seg', role:'group', 'aria-label':aria}, opts.map(o => h('button', {type:'button', id:o[0], 'aria-pressed':o[2]() ? 'true' : 'false', onclick:() => { o[3](); render(); }}, o[1]))));
     form.append(
-      field('שם התרגיל', textInput('f-name', d.name, set('name'), {placeholder:'למשל: לחיצת חזה במכשיר', maxlength:'60'})),
-      h('div', {class:'grid2'},
-        field('מספר המכשיר', textInput('f-machine', d.machine, set('machine'), {placeholder:'למשל: 2', maxlength:'10'})),
-        h('div', {class:'field'}, h('span', {text:'קבוצת שרירים'}), selectWrap(gs))),
-      field('תיאור המכשיר', textInput('f-desc', d.desc, set('desc'), {placeholder:'למשל: ריפוד אדום, ליד החלון', maxlength:'120'})),
-      h('div', {class:'grid3'},
+      field('שם התרגיל', textInput('f-name', d.name, set('name'), {placeholder:bw ? 'למשל: פלאנק צד' : 'למשל: לחיצת חזה במכשיר', maxlength:'60'})),
+      seg('סוג', 'סוג התרגיל', [
+        ['f-eq-m', 'במכשיר', () => !bw, () => { d.equip = 'machine'; }],
+        ['f-eq-b', 'ללא מכשיר', () => bw, () => { d.equip = 'body'; }]]),
+      bw ? h('div', {class:'field'}, h('span', {text:'קבוצת שרירים'}), selectWrap(gs))
+         : h('div', {class:'grid2'},
+            field('מספר המכשיר', textInput('f-machine', d.machine, set('machine'), {placeholder:'למשל: 2', maxlength:'10'})),
+            h('div', {class:'field'}, h('span', {text:'קבוצת שרירים'}), selectWrap(gs))),
+      field(bw ? 'איך מבצעים' : 'תיאור המכשיר', textInput('f-desc', d.desc, set('desc'), {placeholder:bw ? 'למשל: על הברכיים, גב ישר' : 'למשל: ריפוד אדום, ליד החלון', maxlength:'120'})),
+      seg('נמדד ב', 'יחידת המדידה', [
+        ['f-u-r', 'חזרות', () => !secs, () => { d.unit = 'reps'; }],
+        ['f-u-s', 'שניות', () => secs, () => { d.unit = 'sec'; }]]),
+      seg('צדדים', 'האם לכל צד', [
+        ['f-ps-n', 'רגיל', () => !d.perSide, () => { d.perSide = false; }],
+        ['f-ps-y', 'לכל צד', () => !!d.perSide, () => { d.perSide = true; }]]),
+      h('div', {class:bw ? 'grid2' : 'grid3'},
         field('סטים', textInput('f-sets', d.sets, set('sets'), {inputmode:'numeric'})),
-        field('חזרות', textInput('f-reps', d.reps, set('reps'), {inputmode:'numeric'})),
-        field('משקל (ק״ג)', textInput('f-weight', d.weight, set('weight'), {inputmode:'decimal'}))));
+        field(secs ? 'שניות' : 'חזרות', textInput('f-reps', d.reps, set('reps'), {inputmode:'numeric'})),
+        bw ? null : field('משקל (ק״ג)', textInput('f-weight', d.weight, set('weight'), {inputmode:'decimal'}))));
   }
   const used = isNew ? [] : types().filter(t => t.items.indexOf(c.id) >= 0).map(t => t.name);
   if (used.length > 1) form.append(h('p', {class:'hint', text:'השינויים יחולו על כל האימונים שבהם הוא מופיע: ' + used.join(', ') + '.'}));
@@ -1444,7 +1470,7 @@ function saveItem(){
     item.id = sub.id; app.catalog[i] = item;
   }
   savePlan(app);
-  toast(sub.kind === 'cardio' ? 'הפעילות נשמרה' : 'המכשיר נשמר');
+  toast(sub.kind === 'cardio' ? 'הפעילות נשמרה' : 'התרגיל נשמר');
   closeSub();
 }
 function deleteItem(id){
@@ -1534,7 +1560,7 @@ function restorePanel(){
     const text = S.app
       ? (wn ? 'השחזור יחליף את המכשירים, סוגי האימונים והלוח הקבוע, ויוסיף ' + wTxt + ' מהגיבוי לפי תאריך. אימונים שלא מופיעים בגיבוי יישארו.'
             : 'השחזור יחליף את המכשירים, סוגי האימונים והלוח הקבוע. אימונים שכבר שמורים במכשיר יישארו.')
-      : 'בגיבוי ' + [itemsSummary(sn, cn) || 'אין מכשירים', tTxt, wTxt].join(', ') + '. לטעון אותו?';
+      : 'בגיבוי ' + [itemsSummary(sn, cn) || 'אין תרגילים', tTxt, wTxt].join(', ') + '. לטעון אותו?';
     wrap.append(confirmBox(text, 'שחזור', doRestore));
   } else wrap.append(h('div', {class:'factions'}, h('button', {class:'btn', type:'button', id:'rs-go', onclick:checkRestore}, 'שחזור מהטקסט')));
   return wrap;
