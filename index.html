@@ -145,7 +145,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px soli
 .name{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:1.05rem;font-weight:700;line-height:1.3}
 .row.done.live .nm{text-decoration:line-through;text-decoration-thickness:2px;opacity:.6}
 .num{display:inline-block;background:var(--mark);color:var(--on-mark);font-size:.75rem;font-weight:700;line-height:1.55;border-radius:5px;padding:0 7px}
-.num.body{background:transparent;color:var(--dim);box-shadow:inset 0 0 0 1px var(--line)}
+.num.nomach{background:transparent;color:var(--dim);box-shadow:inset 0 0 0 1px var(--line)}
 .meta{font-size:.9rem;color:var(--dim)}
 .desc{font-size:.84rem;color:var(--dim)}
 .skip{font-size:.8rem;color:var(--dim);font-weight:700}
@@ -1068,7 +1068,7 @@ function tickBtn(key, done, name, onClick){
 function stateMark(done){ return h('span', {class:'state ' + (done ? 'yes' : 'no'), role:'img', 'aria-label':done ? 'בוצע' : 'לא בוצע', html:done ? I.check : I.dash}); }
 function nameLine(name, machine, body){
   const el = h('div', {class:'name'}, h('span', {class:'nm', text:name}));
-  if (body) el.append(h('span', {class:'num body', text:'ללא מכשיר'}));
+  if (body) el.append(h('span', {class:'num nomach', text:'ללא מכשיר'}));
   else if (machine) el.append(h('span', {class:'num', text:'מכשיר ' + machine}));
   return el;
 }
