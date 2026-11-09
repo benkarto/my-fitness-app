@@ -41,6 +41,8 @@
   --ok:#4F9B79;
   --wait:#C98A2E;
   --bad:#D2493E;
+  --c-run:#C3352B;
+  --c-walk:#2F78B5;
   --font:'Heebo', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
   color-scheme:light;
 }
@@ -49,7 +51,7 @@
     --paper:#111416; --card:#1A1E21; --ink:#ECE7E0; --dim:#A19B92; --line:#31373B; --field:#15191C;
     --head:#20262A; --head-fg:#ECE7E0; --head-dim:#A39D94; --head-line:#3A4247;
     --done:#5FA886; --done-wash:#17261F; --on-done:#0C1712;
-    --mark:#C9443A; --on-mark:#FFFFFF;
+    --mark:#C9443A; --on-mark:#FFFFFF; --c-run:#E0574C; --c-walk:#4F98D6;
     --ok:#6CC097; --wait:#E0A44A; --bad:#EF6A5E;
     color-scheme:dark;
   }
@@ -58,7 +60,7 @@
   --paper:#111416; --card:#1A1E21; --ink:#ECE7E0; --dim:#A19B92; --line:#31373B; --field:#15191C;
   --head:#20262A; --head-fg:#ECE7E0; --head-dim:#A39D94; --head-line:#3A4247;
   --done:#5FA886; --done-wash:#17261F; --on-done:#0C1712;
-  --mark:#C9443A; --on-mark:#FFFFFF;
+  --mark:#C9443A; --on-mark:#FFFFFF; --c-run:#E0574C; --c-walk:#4F98D6;
   --ok:#6CC097; --wait:#E0A44A; --bad:#EF6A5E;
   color-scheme:dark;
 }
@@ -279,9 +281,34 @@ legend{font-size:.9rem;font-weight:800;padding:0 6px}
 .wtitle{font-size:2.5rem;font-weight:800;letter-spacing:-.02em;line-height:1.05;padding-inline:4px}
 .choice{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;justify-items:start}
 
+/* progress charts */
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 12px 12px;display:grid;gap:10px}
+.pcard h2{margin:0;font-size:1.02rem}
+.psub{color:var(--dim);font-size:.86rem;margin:-6px 0 0}
+.chart{width:100%;height:auto;display:block;overflow:visible;direction:ltr}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .axt{fill:var(--dim);font-size:11px;font-family:var(--font)}
+.chart .ln{fill:none;stroke:var(--c-walk);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .pt{fill:var(--c-walk);stroke:var(--card);stroke-width:2}
+.chart .pt.sel{r:6}
+.chart .hit{fill:transparent;cursor:pointer}
+.chart .b-run{fill:var(--c-run)}
+.chart .b-walk{fill:var(--c-walk)}
+.chart .selbar{fill:var(--field)}
+.pinfo{font-size:.92rem;min-height:1.4em;color:var(--ink)}
+.pinfo b{font-weight:700}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.86rem;color:var(--dim)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-inline-end:5px;vertical-align:-1px}
+.ptable{font-size:.86rem;color:var(--dim)}
+.ptable summary{cursor:pointer;color:var(--ink)}
+.ptable table{border-collapse:collapse;width:100%;margin-top:6px}
+.ptable td,.ptable th{text-align:start;padding:4px 6px;border-bottom:1px solid var(--line);font-weight:400}
+.ptable th{color:var(--dim)}
+.pempty{color:var(--dim);font-size:.92rem}
+
 /* tab bar */
 .tabs{position:fixed;inset-inline:0;bottom:0;z-index:20;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-.tabs-in{max-width:560px;margin-inline:auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.tabs-in{max-width:560px;margin-inline:auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
 .tab{display:grid;justify-items:center;gap:2px;padding:8px 2px 9px;min-height:58px;border:0;background:none;color:var(--dim);font-size:.78rem;font-weight:500;cursor:pointer}
 .tab svg{width:24px;height:24px}
 .tab[aria-current="page"]{color:var(--ink);font-weight:700}
@@ -312,6 +339,7 @@ legend{font-size:.9rem;font-weight:800;padding:0 6px}
     <button class="tab" type="button" id="tab-schedule" data-tab="schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="1.8" fill="currentColor"/><circle cx="15" cy="12" r="1.8" fill="currentColor"/><circle cx="10" cy="18" r="1.8" fill="currentColor"/></svg><span>לוח קבוע</span></button>
     <button class="tab" type="button" id="tab-types" data-tab="types"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg><span>אימונים</span></button>
     <button class="tab" type="button" id="tab-history" data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>היסטוריה</span></button>
+    <button class="tab" type="button" id="tab-progress" data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5h16"/><path d="M5 15l4.5-4.5 3.5 3 6-6.5"/><path d="M15 7h4v4"/></svg><span>התקדמות</span></button>
   </div>
 </nav>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -462,8 +490,8 @@ function cardioLines(c){
   if (c.notes) L.push(c.notes);
   return L;
 }
-const emptyResult = () => ({min:null, sec:null, km:null, hr:null, kcal:null});
-const hasResult = r => !!r && ['min','sec','km','hr','kcal'].some(k => r[k] != null && r[k] !== '');
+const emptyResult = () => ({min:null, sec:null, km:null, hr:null, kcal:null, runMin:null, walkMin:null});
+const hasResult = r => !!r && ['min','sec','km','hr','kcal','runMin','walkMin'].some(k => r[k] != null && r[k] !== '');
 function timeStr(r){
   const m = num(r.min), s = num(r.sec);
   if (m == null && s == null) return '';
@@ -477,6 +505,8 @@ function resultText(r){
   if (num(r.km) != null) a.push(fmtNum(r.km) + ' ק״מ');
   if (num(r.hr) != null) a.push('דופק ממוצע ' + fmtNum(r.hr));
   if (num(r.kcal) != null) a.push(fmtNum(r.kcal) + ' קלוריות');
+  if (num(r.runMin) != null) a.push('ריצה ' + fmtNum(r.runMin) + ' דק׳');
+  if (num(r.walkMin) != null) a.push('הליכה ' + fmtNum(r.walkMin) + ' דק׳');
   return a.join(', ');
 }
 function isStandalone(){ try { return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches; } catch (e) { return false; } }
@@ -736,6 +766,7 @@ function render(){
   else if (S.tab === 'schedule') nodes = viewSchedule();
   else if (S.tab === 'types') nodes = S.sub ? viewSub() : viewTypes();
   else if (S.tab === 'history') nodes = viewHistory();
+  else if (S.tab === 'progress') nodes = viewProgress();
   else nodes = viewWeek();
   nodes = [].concat(nodes);
   if (S.updateReady) nodes.unshift(updateBanner());
@@ -1131,7 +1162,7 @@ function cardioRow(it, tid, mode, k){
   else if (mode === 'view') row.append(stateMark(it.done));
   const body = h('div', {class:'body'}, nameLine(it.name, ''));
   cardioLines(it).forEach(l => body.append(h('div', {class:'meta', text:l})));
-  if (interactive) body.append(resultsForm(key, it.result || emptyResult(), (f, v) => setResult(mode, k, tid, it.id, f, v)));
+  if (interactive) body.append(resultsForm(key, it.result || emptyResult(), (f, v) => setResult(mode, k, tid, it.id, f, v), it.mode === 'walkrun'));
   else if (mode === 'view') {
     const r = resultText(it.result);
     if (r) body.append(h('div', {class:'res', text:r}));
@@ -1140,7 +1171,7 @@ function cardioRow(it, tid, mode, k){
   row.append(body);
   return row;
 }
-function resultsForm(key, r, onSet){
+function resultsForm(key, r, onSet, withRun){
   const inp = (f, ph, mode, label) => h('input', {class:'rin', id:'r-' + key + '-' + f, inputmode:mode, autocomplete:'off', enterkeyhint:'done', maxlength:'6',
     placeholder:ph, value:r[f] == null ? '' : fmtNum(r[f]), 'aria-label':label, onkeydown:enterBlur,
     oninput:e => { const v = e.target.value.trim(); if (v === '') { onSet(f, null); return; } const n = num(v); if (n != null && n >= 0) onSet(f, round2(n)); }});
@@ -1151,7 +1182,9 @@ function resultsForm(key, r, onSet){
         h('div', {class:'time', dir:'ltr'}, inp('min', 'דק׳', 'numeric', 'זמן, דקות'), h('span', {class:'colon', text:':'}), inp('sec', 'שנ׳', 'numeric', 'זמן, שניות'))),
       h('label', {class:'rf'}, h('span', {class:'rl', text:'מרחק (ק״מ)'}), inp('km', '', 'decimal', 'מרחק בקילומטרים')),
       h('label', {class:'rf'}, h('span', {class:'rl', text:'דופק ממוצע'}), inp('hr', '', 'numeric', 'דופק ממוצע')),
-      h('label', {class:'rf'}, h('span', {class:'rl', text:'קלוריות'}), inp('kcal', '', 'numeric', 'קלוריות'))));
+      h('label', {class:'rf'}, h('span', {class:'rl', text:'קלוריות'}), inp('kcal', '', 'numeric', 'קלוריות')),
+      withRun ? h('label', {class:'rf'}, h('span', {class:'rl', text:'דקות ריצה'}), inp('runMin', '', 'decimal', 'דקות ריצה בסך הכול')) : null,
+      withRun ? h('label', {class:'rf'}, h('span', {class:'rl', text:'דקות הליכה'}), inp('walkMin', '', 'decimal', 'דקות הליכה בסך הכול')) : null));
 }
 function setResult(mode, k, tid, iid, f, v){
   if (mode === 'live') {
@@ -1483,6 +1516,129 @@ function deleteItem(id){
   savePlan(app);
   toast('נמחק');
   closeSub();
+}
+
+/* ---------- progress ---------- */
+/* Every saved workout, oldest first, as points for the charts. Cardio points come from the treadmill
+   results typed in after a session; strength points from the weight of each exercise that was done. */
+function progressData(){
+  const keys = Object.keys(S.workouts).filter(isKey).sort();
+  const cardio = [], strength = {};
+  keys.forEach(k => (S.workouts[k].sessions || []).forEach(s => (s.items || []).forEach(i => {
+    if (i.kind === 'cardio') {
+      const r = i.result || {};
+      if (!hasResult(r)) return;
+      const t = num(r.min) != null || num(r.sec) != null ? (num(r.min) || 0) + (num(r.sec) || 0) / 60 : null;
+      let run = num(r.runMin), walk = num(r.walkMin);
+      if (run == null && walk == null && i.mode !== 'walkrun' && t != null) { run = 0; walk = t; }
+      cardio.push({k, hr:num(r.hr), km:num(r.km), t, pace:t != null && num(r.km) ? t / num(r.km) : null, run, walk});
+    } else if (i.kind === 'strength' && i.done && num(i.weight) != null) {
+      const e = strength[i.id] || (strength[i.id] = {name:i.name, pts:[]});
+      e.name = i.name;
+      const last = e.pts[e.pts.length - 1];
+      if (last && last.k === k) last.v = num(i.weight); else e.pts.push({k, v:num(i.weight)});
+    }
+  })));
+  return {cardio, strength};
+}
+const PMETRICS = [
+  ['hr', 'דופק ממוצע', 'דופק ממוצע בהליכון. אותו מאמץ בדופק נמוך יותר הוא שיפור בכושר.'],
+  ['km', 'מרחק', 'מרחק בקילומטרים בכל אימון הליכון.'],
+  ['pace', 'קצב', 'דקות לקילומטר. נמוך יותר זה מהר יותר.'],
+  ['runwalk', 'ריצה מול הליכה', 'דקות ריצה ודקות הליכה בכל אימון.'],
+  ['weight', 'משקלים', 'המשקל שעבדת איתו בתרגיל לאורך זמן.']];
+function fmtPace(v){ const m = Math.floor(v), s = Math.round((v - m) * 60); return (s === 60 ? m + 1 : m) + ':' + pad(s === 60 ? 0 : s); }
+function shortDate(k){ const d = keyDate(k); return d.getDate() + '.' + (d.getMonth() + 1); }
+function niceRange(lo, hi){
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const span = hi - lo, step0 = span / 4, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= step0) || 10 * mag;
+  return {lo:Math.floor(lo / step) * step, hi:Math.ceil(hi / step) * step, step};
+}
+const SVGNS = 'http://www.w3.org/2000/svg';
+function sv(tag, attrs, text){ const el = D.createElementNS(SVGNS, tag); for (const a in attrs) el.setAttribute(a, attrs[a]); if (text != null) el.textContent = text; return el; }
+/* One chart = one measure on one axis. pts: [{k, v}] for a line, or [{k, a, b}] for stacked bars (a = run, b = walk). */
+function chartSvg(pts, opt){
+  const W = 340, H = 190, L = 34, R = 8, T = 10, B = 26, pw = W - L - R, ph = H - T - B;
+  const vals = opt.stack ? pts.map(p => (p.a || 0) + (p.b || 0)) : pts.map(p => p.v);
+  let lo = opt.stack ? 0 : Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if (!opt.stack) { const pad0 = (hi - lo) * .15 || Math.abs(hi) * .05 || 1; lo -= pad0; hi += pad0; if (opt.floor0 && lo < 0) lo = 0; }
+  const nr = niceRange(lo, hi); lo = opt.stack ? 0 : nr.lo; hi = nr.hi;
+  const y = v => T + ph - (v - lo) / (hi - lo) * ph;
+  const n = pts.length, slot = pw / n, x = i => L + slot * (i + .5);
+  const svg = sv('svg', {viewBox:'0 0 ' + W + ' ' + H, class:'chart', role:'img', 'aria-label':opt.label});
+  for (let v = lo; v <= hi + 1e-9; v += nr.step) {
+    svg.append(sv('line', {class:'grid', x1:L, x2:W - R, y1:y(v), y2:y(v)}));
+    svg.append(sv('text', {class:'axt', x:L - 6, y:y(v) + 4, 'text-anchor':'end'}, opt.fmt ? opt.fmt(v) : fmtNum(round2(v))));
+  }
+  const every = Math.max(1, Math.ceil(n / 6));
+  pts.forEach((p, i) => { if (i % every === 0 || i === n - 1) svg.append(sv('text', {class:'axt', x:x(i), y:H - 8, 'text-anchor':'middle'}, shortDate(p.k))); });
+  if (opt.stack) {
+    const bw = Math.min(22, slot * .6);
+    pts.forEach((p, i) => {
+      if (i === opt.sel) svg.append(sv('rect', {class:'selbar', x:x(i) - slot / 2, y:T, width:slot, height:ph}));
+      const a = p.a || 0, b = p.b || 0, gap = a && b ? 1 : 0;
+      if (a) svg.append(sv('rect', {class:'b-run', x:x(i) - bw / 2, y:y(a), width:bw, height:Math.max(0, y(0) - y(a)), rx:2}));
+      if (b) svg.append(sv('rect', {class:'b-walk', x:x(i) - bw / 2, y:y(a + b), width:bw, height:Math.max(0, y(a) - y(a + b) - gap * 2), rx:2}));
+    });
+  } else {
+    if (n > 1) svg.append(sv('polyline', {class:'ln', points:pts.map((p, i) => x(i) + ',' + y(p.v)).join(' ')}));
+    pts.forEach((p, i) => svg.append(sv('circle', {class:'pt' + (i === opt.sel ? ' sel' : ''), cx:x(i), cy:y(p.v), r:i === opt.sel ? 6 : 4})));
+  }
+  pts.forEach((p, i) => { const hit = sv('rect', {class:'hit', x:x(i) - slot / 2, y:0, width:slot, height:H, tabindex:'0', 'aria-label':opt.tip(p)});
+    hit.addEventListener('click', () => opt.onSel(i)); hit.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opt.onSel(i); } });
+    svg.append(hit); });
+  return svg;
+}
+function viewProgress(){
+  const out = [h('header', {class:'vhead'}, h('h1', {text:'התקדמות'}), statusEl())];
+  const data = progressData(), m = S.progMetric || 'hr', meta = PMETRICS.find(x => x[0] === m) || PMETRICS[0];
+  out.push(h('div', {class:'seg', role:'group', 'aria-label':'מה להציג'}, PMETRICS.map(x => h('button', {type:'button', id:'pm-' + x[0], 'aria-pressed':x[0] === m ? 'true' : 'false',
+    onclick:() => { S.progMetric = x[0]; S.progSel = null; render(); }}, x[1]))));
+  const card = h('section', {class:'pcard'});
+  let pts = [], opt = null, rows = [], heads = [];
+  if (m === 'weight') {
+    const ids = Object.keys(data.strength).filter(id => data.strength[id].pts.length);
+    if (!ids.length) { card.append(h('h2', {text:meta[1]}), h('p', {class:'pempty', text:'עוד אין תרגילים עם משקל שבוצעו.'})); out.push(card); return out; }
+    const cur = ids.indexOf(S.progEx) >= 0 ? S.progEx : ids[0];
+    const sel = h('select', {id:'pm-ex', 'aria-label':'תרגיל', onchange:e => { S.progEx = e.target.value; S.progSel = null; render(); }});
+    ids.forEach(id => { const o = h('option', {value:id, text:data.strength[id].name}); if (id === cur) o.selected = true; sel.append(o); });
+    card.append(h('h2', {text:meta[1]}), h('p', {class:'psub', text:meta[2]}), selectWrap(sel));
+    pts = data.strength[cur].pts;
+    const isAssist = /מתח/.test(data.strength[cur].name);
+    if (isAssist) card.append(h('p', {class:'psub', text:'במתח המספר הוא משקל התמיכה, כך שירידה היא שיפור.'}));
+    opt = {label:'משקל לאורך זמן, ' + data.strength[cur].name, floor0:true, tip:p => 'ב־' + shortDate(p.k) + ': ' + fmtNum(p.v) + ' ק״ג'};
+    heads = ['תאריך', 'משקל (ק״ג)']; rows = pts.map(p => [shortDate(p.k), fmtNum(p.v)]);
+  } else {
+    card.append(h('h2', {text:meta[1]}), h('p', {class:'psub', text:meta[2]}));
+    if (m === 'runwalk') {
+      pts = data.cardio.filter(c => c.run != null || c.walk != null).map(c => ({k:c.k, a:c.run || 0, b:c.walk || 0}));
+      opt = {stack:true, label:'דקות ריצה ודקות הליכה בכל אימון', tip:p => 'ב־' + shortDate(p.k) + ': ריצה ' + fmtNum(round2(p.a)) + ' דק׳, הליכה ' + fmtNum(round2(p.b)) + ' דק׳'};
+      heads = ['תאריך', 'ריצה (דק׳)', 'הליכה (דק׳)']; rows = pts.map(p => [shortDate(p.k), fmtNum(round2(p.a)), fmtNum(round2(p.b))]);
+      card.append(h('div', {class:'legend'}, h('span', null, h('i', {style:'background:var(--c-run)'}), 'ריצה'), h('span', null, h('i', {style:'background:var(--c-walk)'}), 'הליכה')));
+    } else {
+      pts = data.cardio.filter(c => c[m] != null).map(c => ({k:c.k, v:c[m]}));
+      const unit = m === 'hr' ? '' : m === 'km' ? ' ק״מ' : ' דק׳ לק״מ';
+      const f = m === 'pace' ? fmtPace : v => fmtNum(round2(v));
+      opt = {label:meta[1] + ' לאורך זמן', fmt:m === 'pace' ? fmtPace : null, floor0:m === 'km', tip:p => 'ב־' + shortDate(p.k) + ': ' + f(p.v) + unit};
+      heads = ['תאריך', meta[1]]; rows = pts.map(p => [shortDate(p.k), f(p.v) + unit]);
+    }
+  }
+  if (!pts.length) { card.append(h('p', {class:'pempty', text:m === 'runwalk' ? 'עוד אין אימונים עם דקות ריצה והליכה. ממלאים אותן בתוצאות ההליכון אחרי אימון של הליכה וריצה.' : 'עוד אין נתונים. ממלאים את התוצאות מהמסך של ההליכון אחרי כל אימון.'})); out.push(card); return out; }
+  const si = S.progSel != null && S.progSel < pts.length ? S.progSel : pts.length - 1;
+  opt.sel = si; opt.onSel = i => { S.progSel = i; render(); };
+  card.append(chartSvg(pts, opt), h('div', {class:'pinfo', 'aria-live':'polite'}, h('b', {text:opt.tip(pts[si])})));
+  if (pts.length > 1 && m !== 'runwalk') {
+    const a = pts[0].v, b = pts[pts.length - 1].v, d = round2(b - a);
+    const unit = m === 'weight' ? ' ק״ג' : m === 'km' ? ' ק״מ' : m === 'pace' ? '' : '';
+    const dTxt = m === 'pace' ? (d <= 0 ? 'מהיר יותר ב־' : 'איטי יותר ב־') + fmtPace(Math.abs(d)) + ' דק׳ לק״מ' : (d > 0 ? 'עלייה של ' : d < 0 ? 'ירידה של ' : 'ללא שינוי') + (d ? fmtNum(Math.abs(d)) + unit : '');
+    card.append(h('p', {class:'psub', text:'מהמדידה הראשונה (' + shortDate(pts[0].k) + ') לאחרונה: ' + dTxt}));
+  }
+  const tb = h('table'), tr = h('tr'); heads.forEach(x => tr.append(h('th', {text:x}))); tb.append(tr);
+  rows.slice().reverse().forEach(r => { const t = h('tr'); r.forEach(c => t.append(h('td', {text:c}))); tb.append(t); });
+  card.append(h('details', {class:'ptable'}, h('summary', {text:'הצגה כטבלה'}), tb));
+  out.push(card);
+  return out;
 }
 
 /* ---------- history ---------- */
