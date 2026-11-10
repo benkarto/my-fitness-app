@@ -281,6 +281,15 @@ legend{font-size:.9rem;font-weight:800;padding:0 6px}
 .wtitle{font-size:2.5rem;font-weight:800;letter-spacing:-.02em;line-height:1.05;padding-inline:4px}
 .choice{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;justify-items:start}
 
+/* running program */
+.rprog{display:grid;gap:8px;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--field)}
+.rp-head{font-weight:700;font-size:.92rem}
+.rp-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.rp-bar i{display:block;height:100%;background:var(--c-run);border-radius:3px}
+.rp-acts{display:flex;gap:8px;flex-wrap:wrap}
+.rp-note{color:var(--dim);font-size:.84rem}
+.btn.small{min-height:38px;padding:6px 12px;font-size:.9rem}
+
 /* progress charts */
 .pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 12px 12px;display:grid;gap:10px}
 .pcard h2{margin:0;font-size:1.02rem}
@@ -475,12 +484,14 @@ function speedIncline(sp, inc){
 }
 function cardioLines(c){
   const L = [], w = c.walk || {}, r = c.run || {}, cd = c.cooldown || {};
+  if (c.step) L.push('תוכנית ריצה: ' + c.step);
   const walk = speedIncline(w.speed, w.incline);
   if (walk || c.mode === 'walkrun') L.push('הליכה' + (walk ? ' ' + walk : ''));
   if (c.mode === 'walkrun') {
     let run = 'ריצה';
     if (num(r.minutes) != null) run += ' של ' + minutesPhrase(r.minutes);
     if (num(r.every) != null) run += ' כל ' + minutesPhrase(r.every);
+    if (num(r.reps) != null && num(r.reps) > 1) run += ', ' + num(r.reps) + ' פעמים';
     const rs = speedIncline(r.speed, r.incline);
     if (rs) run += ', ' + rs;
     L.push(run);
@@ -641,7 +652,7 @@ function movePermanent(src, tgt){
 
 /* ---------- day records ---------- */
 function recItemFrom(c){
-  if (c.kind === 'cardio') return {id:c.id, kind:'cardio', name:c.name, mode:c.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:num(c.minutes), walk:clone(c.walk || {}), run:clone(c.run || {}), cooldown:clone(c.cooldown || {}), notes:c.notes || '', done:false, result:emptyResult()};
+  if (c.kind === 'cardio') return {id:c.id, kind:'cardio', name:c.name, mode:c.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:num(c.minutes), walk:clone(c.walk || {}), run:clone(c.run || {}), cooldown:clone(c.cooldown || {}), notes:c.notes || '', step:c.step || '', done:false, result:emptyResult()};
   return Object.assign({id:c.id, kind:'strength', name:c.name, machine:isBody(c) ? '' : (c.machine || ''), group:c.group || '', sets:num(c.sets), reps:num(c.reps), weight:isBody(c) ? null : num(c.weight)}, strengthExtra(c), {done:false});
 }
 function frozenSession(tid){
@@ -659,7 +670,7 @@ function liveItems(t, rs){
     const p = prev.get(cid); prev.delete(cid);
     if (c.kind === 'cardio') {
       const src = (p && p.done && p.kind === 'cardio') ? p : c;
-      items.push({id:cid, kind:'cardio', name:src.name || c.name, mode:src.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:num(src.minutes), walk:clone(src.walk || {}), run:clone(src.run || {}), cooldown:clone(src.cooldown || {}), notes:src.notes || '', done:!!(p && p.done), result:Object.assign(emptyResult(), (p && p.result) || {})});
+      items.push({id:cid, kind:'cardio', name:src.name || c.name, mode:src.mode === 'walkrun' ? 'walkrun' : 'walk', minutes:num(src.minutes), walk:clone(src.walk || {}), run:clone(src.run || {}), cooldown:clone(src.cooldown || {}), notes:src.notes || '', step:src.step || '', done:!!(p && p.done), result:Object.assign(emptyResult(), (p && p.result) || {})});
     } else {
       const done = !!(p && p.done);
       const w = isBody(c) ? null : done ? (p.weight != null ? p.weight : num(c.weight)) : num(c.weight);
@@ -1162,6 +1173,7 @@ function cardioRow(it, tid, mode, k){
   else if (mode === 'view') row.append(stateMark(it.done));
   const body = h('div', {class:'body'}, nameLine(it.name, ''));
   cardioLines(it).forEach(l => body.append(h('div', {class:'meta', text:l})));
+  if (mode === 'live' || mode === 'preview') body.append(runProgPanel(it.id));
   if (interactive) body.append(resultsForm(key, it.result || emptyResult(), (f, v) => setResult(mode, k, tid, it.id, f, v), it.mode === 'walkrun'));
   else if (mode === 'view') {
     const r = resultText(it.result);
@@ -1170,6 +1182,51 @@ function cardioRow(it, tid, mode, k){
   }
   row.append(body);
   return row;
+}
+/* ---------- running program ----------
+   A graded walk-to-run plan stored on the cardio item (prog.idx). Moving a step rewrites the run/walk
+   settings of the item, so today's workout and every later one follow the current step. */
+const RUN_STEPS = [
+  {label:'שבוע 1: דקה ריצה, 4 דקות הליכה, 6 פעמים', run:1, every:5, reps:6},
+  {label:'שבוע 2: דקה ריצה, 2 דקות הליכה, 8 פעמים', run:1, every:3, reps:8},
+  {label:'שבוע 3: 2 דקות ריצה, 3 דקות הליכה, 6 פעמים', run:2, every:5, reps:6},
+  {label:'שבוע 4: 3 דקות ריצה, 2 דקות הליכה, 6 פעמים', run:3, every:5, reps:6},
+  {label:'שבוע 5: 5 דקות ריצה, 2 דקות הליכה, 4 פעמים', run:5, every:7, reps:4},
+  {label:'שבוע 6: 8 דקות ריצה, 2 דקות הליכה, 3 פעמים', run:8, every:10, reps:3},
+  {label:'שבוע 7: 12 דקות ריצה, 2 דקות הליכה, פעמיים, ועוד 6 דקות ריצה', run:12, every:14, reps:2},
+  {label:'שבוע 8: 20 דקות ריצה, 2 דקות הליכה, ועוד 10 דקות ריצה', run:20, every:22, reps:1},
+  {label:'שבוע 9: 30 דקות ריצה רצופה', run:30, every:null, reps:1},
+  {label:'שלב 2: ריצה קלה רצופה; הריצה הארוכה בשבוע מתארכת בכ־10% עד 10 ק״מ', run:null, every:null, reps:null},
+  {label:'שלב 3: פעם בשבוע אימון מהירות (הפוגות או טמפו), ושתי ריצות קלות', run:null, every:null, reps:null}];
+function setRunStep(cid, idx){
+  const app = clone(S.app), c = app.catalog.find(x => x.id === cid);
+  if (!c || c.kind !== 'cardio') return;
+  if (idx == null) { delete c.prog; c.step = ''; if (c.run) c.run.reps = null; savePlan(app); toast('תוכנית הריצה הופסקה'); render(); return; }
+  idx = Math.max(0, Math.min(RUN_STEPS.length - 1, idx));
+  const st = RUN_STEPS[idx], r = c.run = c.run || {};
+  c.mode = 'walkrun'; c.prog = {idx}; c.step = st.label;
+  if (st.run != null) { r.minutes = st.run; r.every = st.every; r.reps = st.reps; } else { r.minutes = null; r.every = null; r.reps = null; }
+  if (num(r.speed) == null) r.speed = 7;
+  if (num(r.incline) == null) r.incline = 1;
+  savePlan(app);
+  toast(idx < RUN_STEPS.length - 2 ? 'עברת ל' + st.label.split(':')[0] : 'עברת ל' + st.label.split(':')[0]);
+  render();
+}
+function runProgPanel(cid){
+  const c = catById(cid); if (!c) return null;
+  const box = h('div', {class:'rprog'});
+  if (!c.prog) {
+    box.append(h('button', {class:'btn small', type:'button', id:'rp-start-' + cid, onclick:() => setRunStep(cid, 0)}, 'התחלת תוכנית ריצה מדורגת'));
+    return box;
+  }
+  const i = c.prog.idx, last = RUN_STEPS.length - 1;
+  box.append(h('div', {class:'rp-head', text:'תוכנית ריצה, ' + (i < 9 ? 'שבוע ' + (i + 1) + ' מתוך 9' : i === 9 ? 'שלב 2' : 'שלב 3')}),
+    h('div', {class:'rp-bar', 'aria-hidden':'true'}, h('i', {style:'width:' + Math.round((i + 1) / RUN_STEPS.length * 100) + '%'})),
+    h('div', {class:'rp-acts'},
+      h('button', {class:'btn small', type:'button', id:'rp-prev-' + cid, disabled:i === 0 ? '' : null, onclick:() => setRunStep(cid, i - 1)}, 'לשלב הקודם'),
+      h('button', {class:'btn small primary', type:'button', id:'rp-next-' + cid, disabled:i === last ? '' : null, onclick:() => setRunStep(cid, i + 1)}, 'עברתי לשלב הבא')),
+    h('div', {class:'rp-note', text:'עוברים שלב רק כשכל הקטעים הושלמו ואין כאב ביום שאחרי. אפשר להישאר בשלב כמה שבועות שצריך.'}));
+  return box;
 }
 function resultsForm(key, r, onSet, withRun){
   const inp = (f, ph, mode, label) => h('input', {class:'rin', id:'r-' + key + '-' + f, inputmode:mode, autocomplete:'off', enterkeyhint:'done', maxlength:'6',
@@ -1503,6 +1560,11 @@ function saveItem(){
     if (sub.addTo) { const t = app.types.find(x => x.id === sub.addTo); if (t) t.items.push(item.id); }
   } else {
     const i = app.catalog.findIndex(x => x.id === sub.id); if (i < 0) return;
+    const old = app.catalog[i];
+    if (item.kind === 'cardio' && old.prog) {
+      item.prog = old.prog; item.step = old.step || '';
+      if (old.run && old.run.reps != null) item.run.reps = old.run.reps;
+    }
     item.id = sub.id; app.catalog[i] = item;
   }
   savePlan(app);

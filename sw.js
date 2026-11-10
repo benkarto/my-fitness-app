@@ -1,6 +1,6 @@
 /* My Fitness App: service worker that keeps the app working offline.
    When any file of the app changes, change VERSION as well, so phones pick up the new version. */
-const VERSION = 'mfa-v6-2026-11-10';
+const VERSION = 'mfa-v7-2026-11-10';
 const ASSETS = [
   './',
   'index.html',
